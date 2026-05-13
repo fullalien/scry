@@ -1,0 +1,38 @@
+{
+  "name": "scrcpy-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "scrcpy-web": "dist/bin.js"
+  },
+  "scripts": {
+    "dev": "tsx src/bin.ts start --dev",
+    "dev:devices": "tsx src/bin.ts devices",
+    "dev:doctor": "tsx src/bin.ts doctor",
+    "dev:logs": "tsx src/bin.ts logs --lines 50",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build:web": "vite build --config web/vite.config.ts",
+    "build": "npm run build:web && tsc -p tsconfig.json",
+    "start": "node dist/bin.js start"
+  },
+  "dependencies": {
+    "@fastify/vite": "^9.0.2",
+    "@fastify/websocket": "^11.2.0",
+    "commander": "^13.1.0",
+    "fastify": "^5.3.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.5",
+    "@vitejs/plugin-react": "^4.5.1",
+    "rollup": "^4.60.3",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "vite": "^7.0.0"
+  }
+}
