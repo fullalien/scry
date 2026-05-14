@@ -242,24 +242,25 @@ export class ScrcpyServer extends EventEmitter {
     this.videoSocket = await tcpConnectWithRetry(FORWARD_PORT);
     this.videoReader = new SocketReader(this.videoSocket);
 
-    // 1. Discard the 1-byte dummy (0x00) that the server sends by default
-    //    (sendDummyByte=true in scrcpy v4.0) for connection-error detection.
+    // 1. Discard the 1-byte dummy (0x00) sent by the server (sendDummyByte=true default).
     await this.readOrThrowShellError(1);
 
-    // 2. Read 64-byte device name (null-padded UTF-8)
+    // 2. Connect control socket NOW — the server calls accept() for control immediately
+    //    after sending the dummy byte. Device meta is sent only AFTER all sockets are
+    //    accepted, so we must connect control before reading any more from video socket.
+    this.controlSocket = await tcpConnect(FORWARD_PORT);
+
+    // 3. Read 64-byte device name (null-padded UTF-8)
     const deviceNameBuf = await this.readOrThrowShellError(64);
     const deviceName = deviceNameBuf.toString("utf8").replace(/\0/g, "");
 
-    // 3. Read 4-byte codec_id (e.g. 0x68323634 = "h264")
+    // 4. Read 4-byte codec_id (e.g. 0x68323634 = "h264"), sent as sendStreamMeta header
     const codecBuf = await this.readOrThrowShellError(4);
     const codecId = codecBuf.toString("ascii").replace(/\0/g, "");
 
     console.log(
       `[ScrcpyServer] Connected — device: "${deviceName}", codec: "${codecId}"`,
     );
-
-    // Control socket (no handshake required)
-    this.controlSocket = await tcpConnect(FORWARD_PORT);
   }
 
   /**
