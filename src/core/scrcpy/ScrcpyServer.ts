@@ -1,18 +1,31 @@
 /**
- * ScrcpyServer: directly implements the scrcpy-server TCP protocol.
+ * ScrcpyServer: directly implements the scrcpy-server TCP protocol (v4.0).
  *
- * Flow:
- *  1. adb push scrcpy-server.jar → /data/local/tmp/
- *  2. adb forward tcp:27183 localabstract:scrcpy
- *  3. adb shell app_process … (runs the Java server; non-blocking)
- *  4. TCP connect × 2: video socket (+ handshake) + control socket
- *  5. Read [PTS 8B][size 4B][data] packets; emit framed "data" events
+ * scrcpy-server v4.0 byte stream after TCP connect (tunnel_forward mode):
  *
- * WS frame format emitted on the "data" event:
+ *  Connection sequence:
+ *   1. Server accepts video socket, immediately writes 1 byte 0x00 (dummy byte,
+ *      for connection-error detection — sendDummyByte=true by default)
+ *   2. sendDeviceMeta: 64 bytes device name (null-padded UTF-8)
+ *   3. Encoder starts, writeVideoHeader: 4 bytes codec_id
+ *      (e.g. 0x68323634 = "h264")
+ *   4. Then a stream of "packets":
+ *
+ *  Packet disambiguation (read 4 bytes hi-word first):
+ *   - If hi-word == 0x80000000 (PACKET_FLAG_SESSION >> 32):
+ *       → session/resize meta: [hi:4B already read][width:4B][height:4B] = 12B total, no data
+ *   - Otherwise: regular data packet
+ *       → read 4 bytes lo-word → ptsAndFlags = (hi<<32)|lo (8B)
+ *       → read 4 bytes size
+ *       → read size bytes data
+ *       → if ptsAndFlags & PACKET_FLAG_CONFIG (0x4000…): codec config (SPS+PPS)
+ *       → else: video frame (may have PACKET_FLAG_KEY_FRAME bit)
+ *
+ *  WS frame format emitted on the "data" event (our protocol, browser side):
  *   byte 0     : 0x01  (message type = video)
  *   bytes 1–8  : PTS big-endian uint64
- *                  0x8000_0000_0000_0000 = codec config (SPS+PPS)
- *                  otherwise = frame PTS in microseconds
+ *                  0x8000_0000_0000_0000  → codec config (SPS + PPS)
+ *                  anything else          → video frame PTS in microseconds
  *   bytes 9+   : raw NAL data (Annex-B)
  */
 
@@ -31,6 +44,14 @@ import { getServerJarPath, SERVER_VERSION } from "./ServerJar.js";
 
 const REMOTE_JAR = "/data/local/tmp/scrcpy-server.jar";
 const FORWARD_PORT = 27183;
+
+// scrcpy-server v4.0 Streamer.java packet flags
+const PKT_FLAG_SESSION_HI = 0x80000000; // high 32 bits of PACKET_FLAG_SESSION (1L<<63)
+const PKT_FLAG_CONFIG     = 0x4000000000000000n; // PACKET_FLAG_CONFIG (1L<<62)
+const PKT_FLAG_KEY_FRAME  = 0x2000000000000000n; // PACKET_FLAG_KEY_FRAME (1L<<61)
+
+// Our WS protocol constant for codec config (SPS+PPS) packets
+const WS_CODEC_CONFIG_PTS = 0x8000000000000000n;
 
 export type ScrcpyServerOptions = {
   deviceSerial: string;
@@ -221,21 +242,20 @@ export class ScrcpyServer extends EventEmitter {
     this.videoSocket = await tcpConnectWithRetry(FORWARD_PORT);
     this.videoReader = new SocketReader(this.videoSocket);
 
-    // In tunnel_forward mode the server sends device meta immediately;
-    // no dummy byte needed (and the server never reads from the video socket).
+    // 1. Discard the 1-byte dummy (0x00) that the server sends by default
+    //    (sendDummyByte=true in scrcpy v4.0) for connection-error detection.
+    await this.readOrThrowShellError(1);
 
-    // Read 64-byte device name (null-padded UTF-8)
+    // 2. Read 64-byte device name (null-padded UTF-8)
     const deviceNameBuf = await this.readOrThrowShellError(64);
     const deviceName = deviceNameBuf.toString("utf8").replace(/\0/g, "");
 
-    // Read 12-byte video codec metadata added in scrcpy v2.0:
-    //   [codec_id: u32][initial_width: u32][initial_height: u32]
-    const metaBuf = await this.readOrThrowShellError(12);
-    const initialWidth = metaBuf.readUInt32BE(4);
-    const initialHeight = metaBuf.readUInt32BE(8);
+    // 3. Read 4-byte codec_id (e.g. 0x68323634 = "h264")
+    const codecBuf = await this.readOrThrowShellError(4);
+    const codecId = codecBuf.toString("ascii").replace(/\0/g, "");
 
     console.log(
-      `[ScrcpyServer] Connected — device: "${deviceName}", ${initialWidth}×${initialHeight}`,
+      `[ScrcpyServer] Connected — device: "${deviceName}", codec: "${codecId}"`,
     );
 
     // Control socket (no handshake required)
@@ -261,11 +281,29 @@ export class ScrcpyServer extends EventEmitter {
   private async streamPackets(): Promise<void> {
     try {
       while (this._running) {
-        // Each packet: [PTS: 8B big-endian] [size: 4B big-endian] [data: size B]
-        const header = await this.videoReader.read(12);
-        const pts = header.readBigUInt64BE(0);
-        const size = header.readUInt32BE(8);
+        // Read high 4 bytes to determine packet type.
+        const hiWord = (await this.videoReader.read(4)).readUInt32BE(0);
+
+        if (hiWord === PKT_FLAG_SESSION_HI) {
+          // Session/resize meta: [hi:4B already read][width:4B][height:4B] — 12B total, no data
+          const rest = await this.videoReader.read(8);
+          const w = rest.readUInt32BE(0);
+          const h = rest.readUInt32BE(4);
+          console.log(`[ScrcpyServer] Resolution: ${w}×${h}`);
+          continue;
+        }
+
+        // Regular data packet: read remaining 4B of pts + 4B size
+        const loAndSize = await this.videoReader.read(8);
+        const ptsAndFlags =
+          (BigInt(hiWord) << 32n) | BigInt(loAndSize.readUInt32BE(0));
+        const size = loAndSize.readUInt32BE(4);
         const data = await this.videoReader.read(size);
+
+        const isConfig = (ptsAndFlags & PKT_FLAG_CONFIG) !== 0n;
+        const pts = isConfig
+          ? WS_CODEC_CONFIG_PTS
+          : ptsAndFlags & ~(PKT_FLAG_CONFIG | PKT_FLAG_KEY_FRAME);
 
         // Build WS frame: [type: 0x01][PTS: 8B][data]
         const frame = Buffer.allocUnsafe(1 + 8 + data.length);
