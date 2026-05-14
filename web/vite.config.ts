@@ -9,13 +9,6 @@ export default defineConfig({
   root: __dirname,
   plugins: [react({ jsxRuntime: "automatic" })],
   appType: "spa",
-  server: {
-    // Use a dedicated port for HMR WebSocket so it doesn't conflict
-    // with @fastify/websocket which also attaches to the same HTTP server.
-    hmr: {
-      port: 24678,
-    },
-  },
   build: {
     outDir: "dist",
     emptyOutDir: true,
