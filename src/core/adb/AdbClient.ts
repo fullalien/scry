@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
@@ -20,4 +20,49 @@ export async function listAdbDevices(): Promise<AdbDevice[]> {
       const [id, state] = line.split(/\s+/);
       return { id, state };
     });
+}
+
+export async function adbPush(
+  deviceId: string,
+  local: string,
+  remote: string,
+): Promise<void> {
+  await execFileAsync("adb", ["-s", deviceId, "push", local, remote]);
+}
+
+export async function adbForward(
+  deviceId: string,
+  localPort: number,
+  remoteAbstract: string,
+): Promise<void> {
+  await execFileAsync("adb", [
+    "-s",
+    deviceId,
+    "forward",
+    `tcp:${localPort}`,
+    `localabstract:${remoteAbstract}`,
+  ]);
+}
+
+export async function adbForwardRemove(
+  deviceId: string,
+  localPort: number,
+): Promise<void> {
+  await execFileAsync("adb", [
+    "-s",
+    deviceId,
+    "forward",
+    "--remove",
+    `tcp:${localPort}`,
+  ]).catch(() => {});
+}
+
+/** Spawn `adb shell` without waiting — the shell command runs indefinitely. */
+export function adbShellSpawn(
+  deviceId: string,
+  cmdArgs: string[],
+): ReturnType<typeof spawn> {
+  return spawn("adb", ["-s", deviceId, "shell", ...cmdArgs], {
+    stdio: ["ignore", "ignore", "pipe"],
+  });
 }

@@ -1,6 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { H264WebCodecsDecoder } from "./codec/h264.js";
+import { ScrcpyH264Decoder } from "./codec/h264.js";
 
 type HealthResponse = {
   ok: boolean;
@@ -34,12 +34,6 @@ type AppData = {
   scrcpySessions: ScrcpySession[];
 };
 
-// H.264 MIME types in preference order (High → Main → Baseline profile)
-const H264_MIME_TYPES = [
-  'video/mp4; codecs="avc1.64001F"',
-  'video/mp4; codecs="avc1.4D401F"',
-  'video/mp4; codecs="avc1.42E01E"',
-];
 
 function VideoCanvas({ sessionId }: { sessionId: string }) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
@@ -50,24 +44,16 @@ function VideoCanvas({ sessionId }: { sessionId: string }) {
     if (!canvas) return;
 
     if (!("VideoDecoder" in window)) {
-      // Fallback check: try MSE as a degraded path
-      if (!("MediaSource" in window)) {
-        setStreamError("Neither WebCodecs nor MediaSource API is supported");
-        return;
-      }
-      const mimeType = H264_MIME_TYPES.find((t) => MediaSource.isTypeSupported(t));
-      if (!mimeType) {
-        setStreamError("WebCodecs not supported and no compatible MSE MIME type found");
-        return;
-      }
-      setStreamError("WebCodecs not supported in this browser (Chrome 94+ / Firefox 130+ / Safari 16.4+ required)");
+      setStreamError(
+        "WebCodecs VideoDecoder not supported (Chrome 94+ / Firefox 130+ / Safari 16.4+ required)",
+      );
       return;
     }
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const decoder = new H264WebCodecsDecoder(
+    const decoder = new ScrcpyH264Decoder(
       (frame) => {
         // Resize canvas to match the decoded resolution
         if (canvas.width !== frame.displayWidth || canvas.height !== frame.displayHeight) {
@@ -178,7 +164,7 @@ function App() {
       const res = await fetch("/api/scrcpy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deviceSerial, recordToStdout: true }),
+        body: JSON.stringify({ deviceSerial }),
       });
       const result = (await res.json()) as { ok: boolean; error?: string };
       if (!result.ok) {

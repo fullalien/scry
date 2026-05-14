@@ -1,239 +1,173 @@
 /**
- * H.264 Annex-B stream parser and WebCodecs VideoDecoder wrapper.
+ * WebCodecs decoder for the scrcpy-server binary stream protocol.
  *
- * The server forwards a raw H.264 Annex-B byte stream over WebSocket.
- * This module:
- *  1. Scans incoming chunks for start codes (00 00 01 / 00 00 00 01) to
- *     delineate NAL units.
- *  2. Extracts the codec string from the SPS NAL unit.
- *  3. Feeds EncodedVideoChunk objects to a VideoDecoder configured with
- *     optimizeForLatency:true for minimal display lag.
+ * WebSocket message layout (server → browser):
+ *   byte 0     : message type  0x01 = video
+ *   bytes 1–8  : PTS (big-endian uint64, microseconds)
+ *                  0x8000_0000_0000_0000  → codec config packet (SPS + PPS)
+ *                  anything else          → video frame
+ *   bytes 9+   : NAL data in Annex-B format (00 00 00 01 start codes)
+ *
+ * On receiving a codec config packet we:
+ *   1. Scan for the SPS NAL unit and extract the codec string (avc1.PPCCLL).
+ *   2. Configure a new VideoDecoder.
+ *   3. Save the SPS+PPS bytes to prepend to subsequent keyframes.
+ *
+ * On receiving a video frame we:
+ *   1. Detect keyframes by checking for an IDR NAL unit (type 5).
+ *   2. Prepend the saved SPS+PPS to keyframes so the decoder always gets
+ *      parameter sets before an IDR slice.
+ *   3. Feed an EncodedVideoChunk to the VideoDecoder.
+ *   4. Drop frames when the decode queue is backlogged (> 2 queued).
  */
 
+export const VIDEO_MSG_TYPE = 0x01;
+export const CODEC_CONFIG_PTS = 0x8000000000000000n;
+
 // ---------------------------------------------------------------------------
-// NAL unit parsing
+// NAL utilities
 // ---------------------------------------------------------------------------
 
-/** NAL unit types relevant to stream setup and framing. */
-export const NAL_TYPE = {
-  NON_IDR_SLICE: 1,
-  IDR_SLICE: 5,
-  SPS: 7,
-  PPS: 8,
-} as const;
+const NAL_IDR = 5;
+const NAL_SPS = 7;
 
-/**
- * Scan `buf` for all H.264 Annex-B start code positions.
- * Start codes are either `00 00 01` or `00 00 00 01`.
- */
-function findStartCodes(buf: Uint8Array): number[] {
-  const positions: number[] = [];
-  for (let i = 0; i < buf.length - 2; i++) {
-    if (buf[i] === 0 && buf[i + 1] === 0) {
-      if (buf[i + 2] === 1) {
-        positions.push(i);
-        i += 2;
-      } else if (buf[i + 2] === 0 && i + 3 < buf.length && buf[i + 3] === 1) {
-        positions.push(i);
-        i += 3;
+/** Scan Annex-B data for a NAL unit of a given type; return its offset or -1. */
+function findNalOffset(data: Uint8Array, nalType: number): number {
+  for (let i = 0; i < data.length - 4; i++) {
+    if (data[i] === 0 && data[i + 1] === 0) {
+      let headerOff = -1;
+      if (data[i + 2] === 1) {
+        headerOff = i + 3;
+      } else if (data[i + 2] === 0 && i + 3 < data.length && data[i + 3] === 1) {
+        headerOff = i + 4;
+      }
+      if (headerOff !== -1 && (data[headerOff] & 0x1f) === nalType) {
+        return headerOff;
       }
     }
   }
-  return positions;
+  return -1;
 }
 
-/** Length of the start code at `buf[offset]`. */
-function startCodeLen(buf: Uint8Array, offset: number): number {
-  return buf[offset + 2] === 1 ? 3 : 4;
+function hasIdrNal(data: Uint8Array): boolean {
+  return findNalOffset(data, NAL_IDR) !== -1;
 }
 
 /**
- * Build the codec string `avc1.PPCCLL` from the first three content bytes
- * of an SPS NAL unit (profile_idc, constraint_flags, level_idc).
+ * Extract the avc1.PPCCLL codec string from Annex-B SPS+PPS data.
+ * Returns a safe fallback if SPS cannot be found.
  */
-export function codecStringFromSps(spsNal: Uint8Array): string {
-  const scLen = startCodeLen(spsNal, 0);
-  // spsNal[scLen] is the NAL header; payload starts at scLen+1
-  const profileIdc = spsNal[scLen + 1];
-  const constraintFlags = spsNal[scLen + 2];
-  const levelIdc = spsNal[scLen + 3];
-  return (
-    "avc1." +
-    profileIdc.toString(16).padStart(2, "0") +
-    constraintFlags.toString(16).padStart(2, "0") +
-    levelIdc.toString(16).padStart(2, "0")
-  );
+export function extractCodecString(data: Uint8Array): string {
+  const off = findNalOffset(data, NAL_SPS);
+  if (off !== -1 && off + 3 < data.length) {
+    const p = data[off + 1].toString(16).padStart(2, "0");
+    const c = data[off + 2].toString(16).padStart(2, "0");
+    const l = data[off + 3].toString(16).padStart(2, "0");
+    return `avc1.${p}${c}${l}`;
+  }
+  return "avc1.42E01E";
 }
 
 // ---------------------------------------------------------------------------
-// Parsed frame type
-// ---------------------------------------------------------------------------
-
-export type H264Frame = {
-  /** True for IDR (keyframe), false for P/B frames. */
-  isKey: boolean;
-  /**
-   * Raw Annex-B bytes.  For keyframes, SPS+PPS are prepended so the decoder
-   * can (re)configure itself from the bitstream.
-   */
-  data: Uint8Array;
-  /** Monotonically increasing, in microseconds. */
-  timestamp: number;
-};
-
-// ---------------------------------------------------------------------------
-// Annex-B stream parser
-// ---------------------------------------------------------------------------
-
-/**
- * Incrementally parses an H.264 Annex-B byte stream arriving in arbitrary
- * chunks.  Call `push(chunk)` with each incoming WebSocket binary message;
- * it returns an array of complete `H264Frame` objects ready to decode.
- */
-export class H264AnnexBParser {
-  private buf = new Uint8Array(0);
-  private sps: Uint8Array | null = null;
-  private pps: Uint8Array | null = null;
-  private frameIndex = 0;
-
-  /**
-   * Append `chunk` and return any newly complete H264Frames.
-   * Incomplete trailing NAL data is retained for the next call.
-   */
-  push(chunk: Uint8Array): H264Frame[] {
-    // Append chunk to the internal buffer
-    const merged = new Uint8Array(this.buf.length + chunk.length);
-    merged.set(this.buf);
-    merged.set(chunk, this.buf.length);
-    this.buf = merged;
-
-    const positions = findStartCodes(this.buf);
-    if (positions.length < 2) return [];
-
-    const frames: H264Frame[] = [];
-
-    for (let i = 0; i < positions.length - 1; i++) {
-      const nal = this.buf.slice(positions[i], positions[i + 1]);
-      const scLen = startCodeLen(nal, 0);
-      const type = nal[scLen] & 0x1f;
-
-      if (type === NAL_TYPE.SPS) {
-        this.sps = nal.slice();
-      } else if (type === NAL_TYPE.PPS) {
-        this.pps = nal.slice();
-      } else if (type === NAL_TYPE.IDR_SLICE && this.sps && this.pps) {
-        // Prepend SPS + PPS before the IDR so the decoder sees them together
-        const keyData = new Uint8Array(
-          this.sps.length + this.pps.length + nal.length,
-        );
-        keyData.set(this.sps, 0);
-        keyData.set(this.pps, this.sps.length);
-        keyData.set(nal, this.sps.length + this.pps.length);
-        frames.push({
-          isKey: true,
-          data: keyData,
-          timestamp: this.nextTimestamp(),
-        });
-      } else if (type === NAL_TYPE.NON_IDR_SLICE) {
-        frames.push({
-          isKey: false,
-          data: nal,
-          timestamp: this.nextTimestamp(),
-        });
-      }
-    }
-
-    // Keep bytes starting from the last start code (may be incomplete)
-    this.buf = this.buf.slice(positions[positions.length - 1]);
-
-    return frames;
-  }
-
-  /** Codec string derived from the most recently seen SPS, or null. */
-  get codec(): string | null {
-    return this.sps ? codecStringFromSps(this.sps) : null;
-  }
-
-  /** Reset parser state (e.g. on stream restart). */
-  reset(): void {
-    this.buf = new Uint8Array(0);
-    this.sps = null;
-    this.pps = null;
-    this.frameIndex = 0;
-  }
-
-  private nextTimestamp(): number {
-    // Use a fixed ~30 fps interval; timestamps must be monotonically increasing.
-    return this.frameIndex++ * 33333;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// WebCodecs VideoDecoder wrapper
+// Decoder
 // ---------------------------------------------------------------------------
 
 export type DecoderErrorHandler = (err: Error) => void;
 
 /**
- * Wraps the browser's `VideoDecoder` API.
+ * Decodes the scrcpy-server framed binary stream using the WebCodecs API.
  *
  * Usage:
- *   const dec = new H264WebCodecsDecoder(frame => { ctx.drawImage(frame, 0, 0); frame.close(); });
- *   dec.push(new Uint8Array(wsEvent.data));
+ *   const dec = new ScrcpyH264Decoder(frame => {
+ *     ctx.drawImage(frame, 0, 0);
+ *     frame.close();
+ *   });
+ *   ws.onmessage = e => dec.push(e.data as ArrayBuffer);
  *   // on cleanup:
  *   dec.close();
  */
-export class H264WebCodecsDecoder {
-  private readonly parser = new H264AnnexBParser();
+export class ScrcpyH264Decoder {
   private decoder: VideoDecoder | null = null;
   private configured = false;
-  private readonly onFrame: (frame: VideoFrame) => void;
-  private readonly onError: DecoderErrorHandler;
+  private codecConfig: Uint8Array | null = null;
 
   constructor(
-    onFrame: (frame: VideoFrame) => void,
-    onError: DecoderErrorHandler = (e) => console.error("[H264Decoder]", e),
-  ) {
-    this.onFrame = onFrame;
-    this.onError = onError;
+    private readonly onFrame: (frame: VideoFrame) => void,
+    private readonly onError: DecoderErrorHandler = (e) =>
+      console.error("[H264Decoder]", e),
+  ) {}
+
+  /** Feed one raw WebSocket binary message. */
+  push(buffer: ArrayBuffer): void {
+    const view = new DataView(buffer);
+    if (view.getUint8(0) !== VIDEO_MSG_TYPE) return;
+
+    // Read PTS as two 32-bit halves to avoid BigInt parsing issues in older runtimes
+    const ptsHi = BigInt(view.getUint32(1));
+    const ptsLo = BigInt(view.getUint32(5));
+    const pts = (ptsHi << 32n) | ptsLo;
+
+    const data = new Uint8Array(buffer, 9);
+
+    if (pts === CODEC_CONFIG_PTS) {
+      this.handleCodecConfig(data);
+    } else {
+      this.handleFrame(pts, data);
+    }
   }
 
-  /** Feed a raw chunk from the WebSocket binary message. */
-  push(chunk: Uint8Array): void {
-    const frames = this.parser.push(chunk);
+  private handleCodecConfig(data: Uint8Array): void {
+    const codec = extractCodecString(data);
 
-    for (const frame of frames) {
-      // Configure decoder on the first keyframe (once we have the codec string)
-      if (!this.configured && frame.isKey) {
-        const codec = this.parser.codec;
-        if (!codec) continue;
+    // Save a copy of SPS+PPS to prepend to subsequent keyframes
+    this.codecConfig = data.slice();
 
-        this.decoder = new VideoDecoder({
-          output: (vf) => this.onFrame(vf),
-          error: (e) => this.onError(new Error(String(e))),
-        });
+    this.decoder?.close();
+    this.decoder = new VideoDecoder({
+      output: (frame) => {
+        this.onFrame(frame);
+        frame.close();
+      },
+      error: (e) => this.onError(new Error(String(e))),
+    });
 
-        this.decoder.configure({
-          codec,
-          optimizeForLatency: true,
-        });
+    this.decoder.configure({
+      codec,
+      optimizeForLatency: true,
+    });
 
-        this.configured = true;
-      }
+    this.configured = true;
+  }
 
-      if (!this.configured || !this.decoder) continue;
+  private handleFrame(pts: bigint, data: Uint8Array): void {
+    if (!this.configured || !this.decoder) return;
 
-      try {
-        this.decoder.decode(
-          new EncodedVideoChunk({
-            type: frame.isKey ? "key" : "delta",
-            timestamp: frame.timestamp,
-            data: frame.data,
-          }),
-        );
-      } catch (e) {
-        this.onError(e instanceof Error ? e : new Error(String(e)));
-      }
+    // Drop frames when the decoder is backlogged to avoid unbounded latency
+    if (this.decoder.decodeQueueSize > 2) return;
+
+    const isKey = hasIdrNal(data);
+
+    // For keyframes, prepend the saved SPS+PPS so the decoder always gets
+    // parameter sets even after a seek or restart.
+    let frameData: Uint8Array;
+    if (isKey && this.codecConfig) {
+      frameData = new Uint8Array(this.codecConfig.length + data.length);
+      frameData.set(this.codecConfig, 0);
+      frameData.set(data, this.codecConfig.length);
+    } else {
+      frameData = data;
+    }
+
+    try {
+      this.decoder.decode(
+        new EncodedVideoChunk({
+          type: isKey ? "key" : "delta",
+          timestamp: Number(pts), // PTS is already in microseconds
+          data: frameData,
+        }),
+      );
+    } catch (e) {
+      this.onError(e instanceof Error ? e : new Error(String(e)));
     }
   }
 
@@ -244,6 +178,6 @@ export class H264WebCodecsDecoder {
     }
     this.decoder = null;
     this.configured = false;
-    this.parser.reset();
+    this.codecConfig = null;
   }
 }

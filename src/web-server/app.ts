@@ -8,7 +8,6 @@ import { listAdbDevices } from "../core/adb/AdbClient.js";
 import { ScrcpyManager } from "../core/scrcpy/ScrcpyManager.js";
 
 export type CreateWebServerOptions = {
-  scrcpyPath?: string;
   scrcpyVideoBitRate?: string;
   scrcpyMaxSize?: number;
   scrcpyMaxFps?: number;
@@ -22,7 +21,7 @@ const webRoot = path.join(projectRoot, "web");
 export async function createWebServer(options: CreateWebServerOptions) {
   const app = Fastify({ logger: true });
 
-  const scrcpyManager = new ScrcpyManager(options.scrcpyPath ?? "scrcpy");
+  const scrcpyManager = new ScrcpyManager();
 
   await app.register(fastifyWebsocket);
 
@@ -80,7 +79,6 @@ export async function createWebServer(options: CreateWebServerOptions) {
   app.post("/api/scrcpy", async (request, reply) => {
     const body = request.body as {
       deviceSerial?: string;
-      recordToStdout?: boolean;
       maxSize?: number;
       videoBitRate?: string;
       maxFps?: number;
@@ -92,10 +90,7 @@ export async function createWebServer(options: CreateWebServerOptions) {
       return { ok: false, error: "deviceSerial is required" };
     }
 
-    const result = scrcpyManager.start(deviceSerial, {
-      noDisplay: true,
-      recordToStdout: body?.recordToStdout ?? false,
-      transcodeToH264: body?.recordToStdout ?? false,
+    const result = await scrcpyManager.start(deviceSerial, {
       maxSize: body?.maxSize ?? options.scrcpyMaxSize,
       videoBitRate: body?.videoBitRate ?? options.scrcpyVideoBitRate,
       maxFps: body?.maxFps ?? options.scrcpyMaxFps,
@@ -147,12 +142,17 @@ export async function createWebServer(options: CreateWebServerOptions) {
 
       const onExit = () => {
         if (socket.readyState === socket.OPEN) {
-          socket.close(1000, "scrcpy process exited");
+          socket.close(1000, "scrcpy-server exited");
         }
       };
 
       proc.on("data", onData);
       proc.on("exit", onExit);
+
+      socket.on("message", (msg: Buffer) => {
+        // Forward raw control messages from browser to the device
+        proc.sendControl(msg);
+      });
 
       socket.on("close", () => {
         proc.off("data", onData);

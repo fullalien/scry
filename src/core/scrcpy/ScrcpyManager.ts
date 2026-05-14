@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { ScrcpyProcess, type ScrcpyStartOptions } from "./ScrcpyProcess.js";
+import { ScrcpyServer, type ScrcpyServerOptions } from "./ScrcpyServer.js";
 
 export type ScrcpySessionStatus = "running" | "stopped" | "error";
 
@@ -13,7 +13,7 @@ export type ScrcpySession = {
 };
 
 export type StartScrcpyOptions = Partial<
-  Omit<ScrcpyStartOptions, "deviceSerial" | "scrcpyPath">
+  Omit<ScrcpyServerOptions, "deviceSerial">
 >;
 
 export type StartScrcpyResult =
@@ -22,17 +22,15 @@ export type StartScrcpyResult =
 
 export type StopScrcpyResult = "stopped" | "not-found" | "already-stopped";
 
-type ScrcpyEntry = { session: ScrcpySession; process: ScrcpyProcess };
+type ScrcpyEntry = { session: ScrcpySession; process: ScrcpyServer };
 
 export class ScrcpyManager {
-  private readonly scrcpyPath: string;
   private readonly entries = new Map<string, ScrcpyEntry>();
 
-  constructor(scrcpyPath = "scrcpy") {
-    this.scrcpyPath = scrcpyPath;
-  }
-
-  start(deviceSerial: string, options?: StartScrcpyOptions): StartScrcpyResult {
+  async start(
+    deviceSerial: string,
+    options?: StartScrcpyOptions,
+  ): Promise<StartScrcpyResult> {
     for (const entry of this.entries.values()) {
       if (
         entry.session.deviceSerial === deviceSerial &&
@@ -48,36 +46,35 @@ export class ScrcpyManager {
     const id = randomUUID();
     const now = Date.now();
 
-    let proc: ScrcpyProcess;
+    const server = new ScrcpyServer();
+
     try {
-      proc = new ScrcpyProcess({
-        scrcpyPath: this.scrcpyPath,
+      await server.start({
         deviceSerial,
-        noDisplay: options?.noDisplay ?? true,
-        recordToStdout: options?.recordToStdout ?? false,
         maxSize: options?.maxSize,
-        videoBitRate: options?.videoBitRate,
         maxFps: options?.maxFps,
+        videoBitRate: options?.videoBitRate,
       });
     } catch (err) {
       return {
         ok: false,
-        error: err instanceof Error ? err.message : "Failed to start scrcpy",
+        error:
+          err instanceof Error ? err.message : "Failed to start scrcpy-server",
       };
     }
 
     const session: ScrcpySession = {
       id,
       deviceSerial,
-      pid: proc.pid,
+      pid: server.pid,
       status: "running",
       createdAt: now,
       updatedAt: now,
     };
 
-    this.entries.set(id, { session, process: proc });
+    this.entries.set(id, { session, process: server });
 
-    proc.on("exit", () => {
+    server.on("exit", () => {
       const entry = this.entries.get(id);
       if (entry) {
         this.entries.set(id, {
@@ -87,7 +84,7 @@ export class ScrcpyManager {
       }
     });
 
-    proc.on("error", () => {
+    server.on("error", () => {
       const entry = this.entries.get(id);
       if (entry) {
         this.entries.set(id, {
@@ -137,7 +134,7 @@ export class ScrcpyManager {
       .sort((a, b) => b.createdAt - a.createdAt);
   }
 
-  getProcess(id: string): ScrcpyProcess | undefined {
+  getProcess(id: string): ScrcpyServer | undefined {
     return this.entries.get(id)?.process;
   }
 }

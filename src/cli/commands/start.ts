@@ -39,7 +39,6 @@ export function registerStartCommand(program: Command, config: AppConfig) {
       }
 
       const server = await createWebServer({
-        scrcpyPath: config.scrcpy.path,
         scrcpyVideoBitRate: config.scrcpy.videoBitRate,
         scrcpyMaxSize: config.scrcpy.maxSize,
         scrcpyMaxFps: config.scrcpy.maxFps,
