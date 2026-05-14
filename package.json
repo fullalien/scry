@@ -13,7 +13,7 @@
     "dev:logs": "tsx src/bin.ts logs --lines 50",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build:web": "vite build --config web/vite.config.ts",
-    "build": "npm run build:web && tsc -p tsconfig.json && node -e \"require('fs').cpSync('src/core/scrcpy/resources', 'dist/core/scrcpy/resources', {recursive:true})\"",
+    "build": "npm run build:web && tsc -p tsconfig.json",
     "start": "node dist/bin.js start"
   },
   "dependencies": {
