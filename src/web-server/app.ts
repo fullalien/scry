@@ -8,7 +8,6 @@ import { listAdbDevices } from "../core/adb/AdbClient.js";
 import { ScrcpyManager } from "../core/scrcpy/ScrcpyManager.js";
 
 export type CreateWebServerOptions = {
-  dev: boolean;
   scrcpyPath?: string;
   scrcpyVideoBitRate?: string;
   scrcpyMaxSize?: number;
@@ -29,14 +28,14 @@ export async function createWebServer(options: CreateWebServerOptions) {
 
   await app.register(fastifyVite, {
     root: webRoot,
-    dev: options.dev,
+    dev: false,
     spa: true,
   });
 
   await app.vite.ready();
 
   app.get("/api/health", async () => {
-    return { ok: true, mode: options.dev ? "dev" : "prod" };
+    return { ok: true };
   });
 
   app.get("/api/sessions", async () => {

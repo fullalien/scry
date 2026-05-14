@@ -3,7 +3,6 @@ import { createRoot } from "react-dom/client";
 
 type HealthResponse = {
   ok: boolean;
-  mode: "dev" | "prod";
 };
 
 type Session = {
@@ -137,7 +136,7 @@ function App() {
     <main style={{ fontFamily: "ui-sans-serif, system-ui", padding: 24 }}>
       <h1>scrcpy-web</h1>
       <p>Fastify + @fastify/vite is running.</p>
-      {data ? <p>Server mode: {health?.mode}</p> : <p>Loading…</p>}
+      {data ? <p>Server is running.</p> : <p>Loading…</p>}
       {error ? (
         <p style={{ color: "#b91c1c" }}>
           Error: {error}{" "}
