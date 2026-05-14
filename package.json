@@ -1,9 +1,12 @@
 {
   "name": "scrcpy-web",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
-  "bin": {
+  "files": [
+    "dist/",
+    "resources/"
+  ],
+
     "scrcpy-web": "dist/bin.js"
   },
   "scripts": {
