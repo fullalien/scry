@@ -57,7 +57,16 @@ export async function adbForwardRemove(
   ]).catch(() => {});
 }
 
-/** Spawn `adb shell` without waiting — the shell command runs indefinitely. */
+/** Run `adb shell <cmd>` and return stdout (rejects on non-zero exit). */
+export async function adbShell(
+  deviceId: string,
+  cmd: string,
+): Promise<string> {
+  const { stdout } = await execFileAsync("adb", ["-s", deviceId, "shell", cmd]);
+  return stdout;
+}
+
+
 export function adbShellSpawn(
   deviceId: string,
   cmdArgs: string[],

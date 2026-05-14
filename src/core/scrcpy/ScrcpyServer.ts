@@ -16,11 +16,13 @@
  *   bytes 9+   : raw NAL data (Annex-B)
  */
 
+import fs from "node:fs";
 import net from "node:net";
 import { EventEmitter } from "node:events";
 import type { ChildProcess } from "node:child_process";
 import {
   adbPush,
+  adbShell,
   adbForward,
   adbForwardRemove,
   adbShellSpawn,
@@ -148,8 +150,28 @@ export class ScrcpyServer extends EventEmitter {
     // 1. Get bundled jar path
     const localJar = getServerJarPath();
 
-    // 2. Push jar to device
-    await adbPush(options.deviceSerial, localJar, REMOTE_JAR);
+    // 2. Push jar to device only if remote file is missing or size differs
+    const localJarSize = fs.statSync(localJar).size;
+    const needsPush = await (async () => {
+      try {
+        const out = await adbShell(
+          options.deviceSerial,
+          `stat -c %s ${REMOTE_JAR} 2>/dev/null || echo missing`,
+        );
+        const trimmed = out.trim();
+        if (trimmed === "missing" || trimmed === "") return true;
+        return parseInt(trimmed, 10) !== localJarSize;
+      } catch {
+        return true;
+      }
+    })();
+
+    if (needsPush) {
+      console.log(`[ScrcpyServer] Pushing jar (${localJarSize} bytes)…`);
+      await adbPush(options.deviceSerial, localJar, REMOTE_JAR);
+    } else {
+      console.log("[ScrcpyServer] Jar already up-to-date on device, skipping push.");
+    }
 
     // 3. Set up port forward (remove any stale forward first)
     await adbForwardRemove(options.deviceSerial, FORWARD_PORT);
