@@ -27,50 +27,62 @@ type ScrcpySession = {
   createdAt: number;
 };
 
+type AppData = {
+  health: HealthResponse;
+  sessions: Session[];
+  devices: AdbDevice[];
+  scrcpySessions: ScrcpySession[];
+};
+
+async function fetchAppData(): Promise<AppData> {
+  const [healthRes, sessionsRes, devicesRes, scrcpyRes] = await Promise.all([
+    fetch("/api/health"),
+    fetch("/api/sessions"),
+    fetch("/api/devices"),
+    fetch("/api/scrcpy"),
+  ]);
+
+  if (!healthRes.ok || !sessionsRes.ok) {
+    throw new Error("Failed to load server state");
+  }
+
+  const health = (await healthRes.json()) as HealthResponse;
+  const { sessions } = (await sessionsRes.json()) as { sessions: Session[] };
+  const { devices } = devicesRes.ok
+    ? ((await devicesRes.json()) as { devices: AdbDevice[] })
+    : { devices: [] };
+  const { sessions: scrcpySessions } = scrcpyRes.ok
+    ? ((await scrcpyRes.json()) as { sessions: ScrcpySession[] })
+    : { sessions: [] };
+
+  return { health, sessions, devices, scrcpySessions };
+}
+
 function App() {
-  const [health, setHealth] = React.useState<HealthResponse | null>(null);
-  const [sessions, setSessions] = React.useState<Session[]>([]);
-  const [devices, setDevices] = React.useState<AdbDevice[]>([]);
-  const [scrcpySessions, setScrcpySessions] = React.useState<ScrcpySession[]>([]);
+  const [data, setData] = React.useState<AppData | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [starting, setStarting] = React.useState<Record<string, boolean>>({});
   const [stopping, setStopping] = React.useState<Record<string, boolean>>({});
 
-  async function loadAll() {
+  const loadAll = React.useCallback(async () => {
     try {
-      const [healthRes, sessionsRes, devicesRes, scrcpyRes] = await Promise.all([
-        fetch("/api/health"),
-        fetch("/api/sessions"),
-        fetch("/api/devices"),
-        fetch("/api/scrcpy"),
-      ]);
-
-      if (!healthRes.ok || !sessionsRes.ok) {
-        throw new Error("Failed to load server state");
-      }
-
-      const healthData = (await healthRes.json()) as HealthResponse;
-      const sessionsData = (await sessionsRes.json()) as { sessions: Session[] };
-      const devicesData = devicesRes.ok
-        ? ((await devicesRes.json()) as { devices: AdbDevice[] })
-        : { devices: [] };
-      const scrcpyData = scrcpyRes.ok
-        ? ((await scrcpyRes.json()) as { sessions: ScrcpySession[] })
-        : { sessions: [] };
-
-      setHealth(healthData);
-      setSessions(sessionsData.sessions);
-      setDevices(devicesData.devices);
-      setScrcpySessions(scrcpyData.sessions);
+      setData(await fetchAppData());
     } catch (loadError) {
       const message = loadError instanceof Error ? loadError.message : "Unknown error";
       setError(message);
     }
-  }
+  }, []);
 
   React.useEffect(() => {
     void loadAll();
-  }, []);
+  }, [loadAll]);
+
+  const { health, sessions, devices, scrcpySessions } = data ?? {
+    health: null as HealthResponse | null,
+    sessions: [] as Session[],
+    devices: [] as AdbDevice[],
+    scrcpySessions: [] as ScrcpySession[],
+  };
 
   async function startScrcpy(deviceSerial: string) {
     setStarting((prev) => ({ ...prev, [deviceSerial]: true }));
@@ -80,9 +92,9 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ deviceSerial }),
       });
-      const data = (await res.json()) as { ok: boolean; error?: string };
-      if (!data.ok) {
-        setError(data.error ?? "Failed to start scrcpy");
+      const result = (await res.json()) as { ok: boolean; error?: string };
+      if (!result.ok) {
+        setError(result.error ?? "Failed to start scrcpy");
       } else {
         await loadAll();
       }
@@ -97,9 +109,9 @@ function App() {
     setStopping((prev) => ({ ...prev, [sessionId]: true }));
     try {
       const res = await fetch(`/api/scrcpy/${sessionId}/stop`, { method: "POST" });
-      const data = (await res.json()) as { ok: boolean; error?: string };
-      if (!data.ok) {
-        setError(data.error ?? "Failed to stop scrcpy");
+      const result = (await res.json()) as { ok: boolean; error?: string };
+      if (!result.ok) {
+        setError(result.error ?? "Failed to stop scrcpy");
       } else {
         await loadAll();
       }
@@ -120,7 +132,7 @@ function App() {
     <main style={{ fontFamily: "ui-sans-serif, system-ui", padding: 24 }}>
       <h1>scrcpy-web</h1>
       <p>Fastify + @fastify/vite is running.</p>
-      {health ? <p>Server mode: {health.mode}</p> : <p>Loading health...</p>}
+      {data ? <p>Server mode: {health?.mode}</p> : <p>Loading…</p>}
       {error ? (
         <p style={{ color: "#b91c1c" }}>
           Error: {error}{" "}
