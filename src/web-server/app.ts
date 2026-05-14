@@ -95,6 +95,7 @@ export async function createWebServer(options: CreateWebServerOptions) {
     const result = scrcpyManager.start(deviceSerial, {
       noDisplay: true,
       recordToStdout: body?.recordToStdout ?? false,
+      transcodeToFMP4: body?.recordToStdout ?? false,
       maxSize: body?.maxSize ?? options.scrcpyMaxSize,
       videoBitRate: body?.videoBitRate ?? options.scrcpyVideoBitRate,
       maxFps: body?.maxFps ?? options.scrcpyMaxFps,
