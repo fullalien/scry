@@ -10,8 +10,8 @@ export type ScrcpyStartOptions = {
   maxFps?: number;
   noDisplay?: boolean;
   recordToStdout?: boolean;
-  /** Pipe scrcpy stdout through ffmpeg to produce a fragmented MP4 stream suitable for browser MSE playback. */
-  transcodeToFMP4?: boolean;
+  /** Pipe scrcpy stdout through ffmpeg to extract a raw H.264 Annex-B stream for WebCodecs playback. */
+  transcodeToH264?: boolean;
 };
 
 export class ScrcpyProcess extends EventEmitter {
@@ -60,7 +60,7 @@ export class ScrcpyProcess extends EventEmitter {
     this.pid = child.pid;
 
     if (options.recordToStdout && child.stdout) {
-      if (options.transcodeToFMP4) {
+      if (options.transcodeToH264) {
         const ffmpegPath = options.ffmpegPath ?? "ffmpeg";
         const ffmpegProc = spawn(
           ffmpegPath,
@@ -69,8 +69,7 @@ export class ScrcpyProcess extends EventEmitter {
             "-i", "pipe:0",
             "-c:v", "copy",
             "-an",
-            "-f", "mp4",
-            "-movflags", "frag_keyframe+empty_moov+default_base_moof",
+            "-f", "h264",
             "pipe:1",
           ],
           { stdio: ["pipe", "pipe", "ignore"] },

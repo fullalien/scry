@@ -1,5 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { H264WebCodecsDecoder } from "./codec/h264.js";
 
 type HealthResponse = {
   ok: boolean;
@@ -40,98 +41,64 @@ const H264_MIME_TYPES = [
   'video/mp4; codecs="avc1.42E01E"',
 ];
 
-function VideoStream({ sessionId }: { sessionId: string }) {
-  const videoRef = React.useRef<HTMLVideoElement>(null);
+function VideoCanvas({ sessionId }: { sessionId: string }) {
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const [streamError, setStreamError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-    if (!("MediaSource" in window)) {
-      setStreamError("MediaSource API not supported in this browser");
-      return;
-    }
-
-    const mimeType = H264_MIME_TYPES.find((t) => MediaSource.isTypeSupported(t));
-    if (!mimeType) {
-      setStreamError("No supported H.264/fMP4 MIME type found");
-      return;
-    }
-
-    const ms = new MediaSource();
-    const objectUrl = URL.createObjectURL(ms);
-    video.src = objectUrl;
-
-    let ws: WebSocket | null = null;
-    let sourceBuffer: SourceBuffer | null = null;
-    const queue: ArrayBuffer[] = [];
-    let streamEnded = false;
-    let destroyed = false;
-
-    function flushQueue() {
-      if (sourceBuffer && !sourceBuffer.updating && queue.length > 0) {
-        try {
-          sourceBuffer.appendBuffer(queue.shift()!);
-        } catch (err) {
-          if (!destroyed) {
-            setStreamError(err instanceof Error ? err.message : "Buffer append error");
-          }
-        }
-      }
-    }
-
-    function maybeEndStream() {
-      if (streamEnded && queue.length === 0 && ms.readyState === "open" && sourceBuffer && !sourceBuffer.updating) {
-        ms.endOfStream();
-      }
-    }
-
-    ms.addEventListener("sourceopen", () => {
-      if (destroyed) return;
-      try {
-        sourceBuffer = ms.addSourceBuffer(mimeType);
-        sourceBuffer.mode = "sequence";
-      } catch (err) {
-        setStreamError(err instanceof Error ? err.message : "Failed to open source buffer");
+    if (!("VideoDecoder" in window)) {
+      // Fallback check: try MSE as a degraded path
+      if (!("MediaSource" in window)) {
+        setStreamError("Neither WebCodecs nor MediaSource API is supported");
         return;
       }
+      const mimeType = H264_MIME_TYPES.find((t) => MediaSource.isTypeSupported(t));
+      if (!mimeType) {
+        setStreamError("WebCodecs not supported and no compatible MSE MIME type found");
+        return;
+      }
+      setStreamError("WebCodecs not supported in this browser (Chrome 94+ / Firefox 130+ / Safari 16.4+ required)");
+      return;
+    }
 
-      sourceBuffer.addEventListener("updateend", () => {
-        maybeEndStream();
-        flushQueue();
-        if (video.paused && video.readyState >= 2) {
-          void video.play().catch(() => {});
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const decoder = new H264WebCodecsDecoder(
+      (frame) => {
+        // Resize canvas to match the decoded resolution
+        if (canvas.width !== frame.displayWidth || canvas.height !== frame.displayHeight) {
+          canvas.width = frame.displayWidth;
+          canvas.height = frame.displayHeight;
         }
-      });
+        ctx.drawImage(frame, 0, 0);
+        frame.close();
+      },
+      (err) => setStreamError(err.message),
+    );
 
-      const wsProto = location.protocol === "https:" ? "wss:" : "ws:";
-      ws = new WebSocket(`${wsProto}//${location.host}/ws/stream/${sessionId}`);
-      ws.binaryType = "arraybuffer";
+    const wsProto = location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(`${wsProto}//${location.host}/ws/stream/${sessionId}`);
+    ws.binaryType = "arraybuffer";
 
-      ws.onmessage = (e: MessageEvent<ArrayBuffer>) => {
-        queue.push(e.data);
-        flushQueue();
-      };
+    ws.onmessage = (e: MessageEvent<ArrayBuffer>) => {
+      decoder.push(new Uint8Array(e.data));
+    };
 
-      ws.onerror = () => {
-        if (!destroyed) setStreamError("WebSocket connection error");
-      };
+    ws.onerror = () => setStreamError("WebSocket connection error");
 
-      ws.onclose = (e) => {
-        streamEnded = true;
-        maybeEndStream();
-        if (!destroyed && e.code !== 1000 && e.code !== 1005) {
-          setStreamError(`Stream closed: ${e.reason || `code ${e.code}`}`);
-        }
-      };
-    });
+    ws.onclose = (e) => {
+      if (e.code !== 1000 && e.code !== 1005) {
+        setStreamError(`Stream closed: ${e.reason || `code ${e.code}`}`);
+      }
+    };
 
     return () => {
-      destroyed = true;
-      ws?.close();
-      URL.revokeObjectURL(objectUrl);
-      video.src = "";
+      ws.close();
+      decoder.close();
     };
   }, [sessionId]);
 
@@ -142,13 +109,9 @@ function VideoStream({ sessionId }: { sessionId: string }) {
           Stream error: {streamError}
         </p>
       )}
-      <video
-        ref={videoRef}
+      <canvas
+        ref={canvasRef}
         style={{ width: "100%", maxWidth: 640, display: "block", background: "#000" }}
-        controls
-        muted
-        autoPlay
-        playsInline
       />
     </div>
   );
@@ -301,7 +264,7 @@ function App() {
                     )}
                   </div>
                   {runningSession && (
-                    <VideoStream sessionId={runningSession.id} />
+                    <VideoCanvas sessionId={runningSession.id} />
                   )}
                 </li>
               );
