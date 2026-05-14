@@ -8,6 +8,12 @@ export const appConfigSchema = z.object({
   adb: z.object({
     path: z.string().default("adb"),
   }).default({ path: "adb" }),
+  scrcpy: z.object({
+    path: z.string().default("scrcpy"),
+    maxSize: z.number().int().positive().optional(),
+    videoBitRate: z.string().default("8M"),
+    maxFps: z.number().int().positive().optional(),
+  }).default({ path: "scrcpy", videoBitRate: "8M" }),
   logs: z.object({
     level: z.enum(["debug", "info", "warn", "error"]).default("info"),
     file: z.string().default("~/.scrcpy-web/logs/app.log"),

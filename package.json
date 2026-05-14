@@ -7,7 +7,7 @@
     "scrcpy-web": "dist/bin.js"
   },
   "scripts": {
-    "dev": "tsx src/bin.ts start --dev",
+    "dev": "npm run build:web && tsx src/bin.ts start",
     "dev:devices": "tsx src/bin.ts devices",
     "dev:doctor": "tsx src/bin.ts doctor",
     "dev:logs": "tsx src/bin.ts logs --lines 50",
@@ -17,6 +17,7 @@
     "start": "node dist/bin.js start"
   },
   "dependencies": {
+    "@fastify/static": "^9.1.3",
     "@fastify/vite": "^9.0.2",
     "@fastify/websocket": "^11.2.0",
     "commander": "^13.1.0",

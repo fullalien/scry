@@ -16,11 +16,9 @@ export function registerStartCommand(program: Command, config: AppConfig) {
     .option("--host <host>", "Host", config.server.host)
     .option("--port <port>", "Port", String(config.server.port))
     .option("--session-name <name>", "Optional human-readable session name")
-    .option("--dev", "Run in development mode", false)
     .action(async (options) => {
       const host = options.host as string;
       const port = Number(options.port);
-      const dev = Boolean(options.dev);
       const sessionName = options.sessionName as string | undefined;
       const sessionId = randomUUID();
 
@@ -40,7 +38,12 @@ export function registerStartCommand(program: Command, config: AppConfig) {
         return;
       }
 
-      const server = await createWebServer({ dev });
+      const server = await createWebServer({
+        scrcpyPath: config.scrcpy.path,
+        scrcpyVideoBitRate: config.scrcpy.videoBitRate,
+        scrcpyMaxSize: config.scrcpy.maxSize,
+        scrcpyMaxFps: config.scrcpy.maxFps,
+      });
       await server.listen({ host, port });
 
       const now = Date.now();
@@ -50,7 +53,7 @@ export function registerStartCommand(program: Command, config: AppConfig) {
         host,
         port,
         pid: process.pid,
-        dev,
+        dev: false,
         status: "running",
         createdAt: now,
         updatedAt: now,
@@ -85,14 +88,14 @@ export function registerStartCommand(program: Command, config: AppConfig) {
       });
 
       server.log.info(
-        `scrcpy-web started at http://${host}:${port} (dev=${dev}, session=${sessionId}${sessionName ? `, name=${sessionName}` : ""})`,
+        `scrcpy-web started at http://${host}:${port} (session=${sessionId}${sessionName ? `, name=${sessionName}` : ""})`,
       );
       appendCliLog(config.logs.file, {
         level: "info",
         command: "start",
         session: sessionId,
         msg: "Session started",
-        details: { host, port, dev, sessionName },
+        details: { host, port, sessionName },
       });
     });
 }

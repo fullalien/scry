@@ -33,6 +33,7 @@ export function registerDoctorCommand(program: Command, config: AppConfig) {
       const host = options.host as string;
       const port = Number(options.port);
       let adbOk = false;
+      let scrcpyOk = false;
       let portAvailable = false;
 
       try {
@@ -42,10 +43,18 @@ export function registerDoctorCommand(program: Command, config: AppConfig) {
         adbOk = false;
       }
 
+      try {
+        await execFileAsync(config.scrcpy.path, ["--version"]);
+        scrcpyOk = true;
+      } catch {
+        scrcpyOk = false;
+      }
+
       portAvailable = await isPortAvailable(host, port);
 
       console.log(`Node.js: ${process.version}`);
       console.log(`adb: ${adbOk ? "ok" : "missing"}`);
+      console.log(`scrcpy: ${scrcpyOk ? "ok" : "missing"}`);
       console.log(`port ${host}:${port}: ${portAvailable ? "available" : "in use"}`);
       console.log("WebCodecs: check in browser runtime (feature-detect in client)");
 
@@ -55,6 +64,7 @@ export function registerDoctorCommand(program: Command, config: AppConfig) {
         msg: "Doctor checks completed",
         details: {
           adbOk,
+          scrcpyOk,
           host,
           port,
           portAvailable,
