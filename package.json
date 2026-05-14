@@ -6,7 +6,7 @@
     "dist/",
     "resources/"
   ],
-
+  "bin": {
     "scrcpy-web": "dist/bin.js"
   },
   "scripts": {
