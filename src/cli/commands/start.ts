@@ -40,7 +40,13 @@ export function registerStartCommand(program: Command, config: AppConfig) {
         return;
       }
 
-      const server = await createWebServer({ dev });
+      const server = await createWebServer({
+        dev,
+        scrcpyPath: config.scrcpy.path,
+        scrcpyVideoBitRate: config.scrcpy.videoBitRate,
+        scrcpyMaxSize: config.scrcpy.maxSize,
+        scrcpyMaxFps: config.scrcpy.maxFps,
+      });
       await server.listen({ host, port });
 
       const now = Date.now();

@@ -44,6 +44,10 @@ export function loadConfig(): AppConfig {
     merged.adb.path = process.env.SCRCPY_WEB_ADB_PATH;
   }
 
+  if (process.env.SCRCPY_WEB_SCRCPY_PATH) {
+    merged.scrcpy.path = process.env.SCRCPY_WEB_SCRCPY_PATH;
+  }
+
   merged.logs.file = expandHome(merged.logs.file);
   return merged;
 }
