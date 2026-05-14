@@ -34,8 +34,23 @@ export type ScrcpyServerOptions = {
   deviceSerial: string;
   maxSize?: number;
   maxFps?: number;
+  /** Bit rate in bps, or a suffixed string: "8M" = 8_000_000, "4000K" = 4_000_000. */
   videoBitRate?: number | string;
 };
+
+/** Parse bit-rate values like "8M", "4000K", or plain numbers → bps integer. */
+function parseBitRate(value: number | string | undefined, defaultBps = 4_000_000): number {
+  if (value === undefined || value === null) return defaultBps;
+  if (typeof value === "number") return value;
+  const match = /^(\d+(?:\.\d+)?)\s*([KkMmGg])?$/.exec(value.trim());
+  if (!match) return defaultBps;
+  const n = parseFloat(match[1]);
+  const suffix = (match[2] ?? "").toUpperCase();
+  if (suffix === "K") return Math.round(n * 1_000);
+  if (suffix === "M") return Math.round(n * 1_000_000);
+  if (suffix === "G") return Math.round(n * 1_000_000_000);
+  return Math.round(n);
+}
 
 /**
  * Buffers a Node.js TCP socket and exposes promise-based `read(n)`.
@@ -151,7 +166,7 @@ export class ScrcpyServer extends EventEmitter {
       "video_codec=h264",
       `max_size=${options.maxSize ?? 1080}`,
       `max_fps=${options.maxFps ?? 60}`,
-      `video_bit_rate=${options.videoBitRate ?? 4000000}`,
+      `video_bit_rate=${parseBitRate(options.videoBitRate)}`,
       "audio=false",
       "control=true",
     ]);
