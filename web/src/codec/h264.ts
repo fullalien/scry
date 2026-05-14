@@ -47,11 +47,6 @@ function startCodeLen(buf: Uint8Array, offset: number): number {
   return buf[offset + 2] === 1 ? 3 : 4;
 }
 
-/** NAL unit type (low 5 bits of the first byte after the start code). */
-function nalUnitType(buf: Uint8Array, startOffset: number): number {
-  return buf[startOffset + startCodeLen(buf, startOffset)] & 0x1f;
-}
-
 /**
  * Build the codec string `avc1.PPCCLL` from the first three content bytes
  * of an SPS NAL unit (profile_idc, constraint_flags, level_idc).
@@ -119,7 +114,8 @@ export class H264AnnexBParser {
 
     for (let i = 0; i < positions.length - 1; i++) {
       const nal = this.buf.slice(positions[i], positions[i + 1]);
-      const type = nalUnitType(this.buf, positions[i]);
+      const scLen = startCodeLen(nal, 0);
+      const type = nal[scLen] & 0x1f;
 
       if (type === NAL_TYPE.SPS) {
         this.sps = nal.slice();
@@ -147,7 +143,7 @@ export class H264AnnexBParser {
       }
     }
 
-    // Keep the last (potentially incomplete) NAL unit for the next push
+    // Keep bytes starting from the last start code (may be incomplete)
     this.buf = this.buf.slice(positions[positions.length - 1]);
 
     return frames;
