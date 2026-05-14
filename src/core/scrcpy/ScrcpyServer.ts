@@ -118,6 +118,7 @@ export class ScrcpyServer extends EventEmitter {
   private shellProcess!: ChildProcess;
   private _running = false;
   private deviceSerial = "";
+  private shellExitMessage: string | undefined;
 
   /** Always 0 — we don't have a single process PID like ScrcpyProcess did. */
   readonly pid = 0;
@@ -135,7 +136,8 @@ export class ScrcpyServer extends EventEmitter {
     // 2. Push jar to device
     await adbPush(options.deviceSerial, localJar, REMOTE_JAR);
 
-    // 3. Set up port forward
+    // 3. Set up port forward (remove any stale forward first)
+    await adbForwardRemove(options.deviceSerial, FORWARD_PORT);
     await adbForward(options.deviceSerial, FORWARD_PORT, "scrcpy");
 
     // 4. Launch the scrcpy Java server (runs indefinitely — do NOT await)
@@ -155,7 +157,17 @@ export class ScrcpyServer extends EventEmitter {
     ]);
 
     this.shellProcess.stderr?.on("data", (chunk: Buffer) => {
-      this.emit("log", chunk.toString());
+      const text = chunk.toString();
+      process.stderr.write(`[scrcpy-server] ${text}`);
+      this.emit("log", text);
+    });
+
+    this.shellProcess.on("exit", (code, signal) => {
+      this.shellExitMessage = `code=${code} signal=${signal}`;
+      if (this._running) {
+        this._running = false;
+        this.emit("exit", code, signal);
+      }
     });
 
     // 5. Connect and complete handshake (with retry while server boots)
@@ -172,26 +184,41 @@ export class ScrcpyServer extends EventEmitter {
     this.videoSocket = await tcpConnectWithRetry(FORWARD_PORT);
     this.videoReader = new SocketReader(this.videoSocket);
 
-    // Handshake: send 1 dummy byte → server replies with device metadata
-    this.videoSocket.write(Buffer.alloc(1));
+    // In tunnel_forward mode the server sends device meta immediately;
+    // no dummy byte needed (and the server never reads from the video socket).
 
     // Read 64-byte device name (null-padded UTF-8)
-    const deviceNameBuf = await this.videoReader.read(64);
+    const deviceNameBuf = await this.readOrThrowShellError(64);
     const deviceName = deviceNameBuf.toString("utf8").replace(/\0/g, "");
 
     // Read 12-byte video codec metadata added in scrcpy v2.0:
     //   [codec_id: u32][initial_width: u32][initial_height: u32]
-    const metaBuf = await this.videoReader.read(12);
+    const metaBuf = await this.readOrThrowShellError(12);
     const initialWidth = metaBuf.readUInt32BE(4);
     const initialHeight = metaBuf.readUInt32BE(8);
 
-    this.emit(
-      "log",
+    console.log(
       `[ScrcpyServer] Connected — device: "${deviceName}", ${initialWidth}×${initialHeight}`,
     );
 
     // Control socket (no handshake required)
     this.controlSocket = await tcpConnect(FORWARD_PORT);
+  }
+
+  /**
+   * Read `n` bytes from the video socket, or re-throw with a richer error
+   * message if the shell process has already exited.
+   */
+  private async readOrThrowShellError(n: number): Promise<Buffer> {
+    try {
+      return await this.videoReader.read(n);
+    } catch (err) {
+      const msg = this.shellExitMessage ?? (err instanceof Error ? err.message : String(err));
+      throw new Error(
+        `[ScrcpyServer] Video socket closed during handshake (reading ${n}B). ` +
+          `Shell exit: ${msg}. Check server logs above.`,
+      );
+    }
   }
 
   private async streamPackets(): Promise<void> {
