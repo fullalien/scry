@@ -58,15 +58,20 @@ async function fetchAppData(): Promise<AppData> {
   return { health, sessions, devices, scrcpySessions };
 }
 
+// Cached outside the component so React StrictMode remounts don't cause a null flash.
+let dataCache: AppData | null = null;
+
 function App() {
-  const [data, setData] = React.useState<AppData | null>(null);
+  const [data, setData] = React.useState<AppData | null>(dataCache);
   const [error, setError] = React.useState<string | null>(null);
   const [starting, setStarting] = React.useState<Record<string, boolean>>({});
   const [stopping, setStopping] = React.useState<Record<string, boolean>>({});
 
   const loadAll = React.useCallback(async () => {
     try {
-      setData(await fetchAppData());
+      const newData = await fetchAppData();
+      dataCache = newData;
+      setData(newData);
     } catch (loadError) {
       const message = loadError instanceof Error ? loadError.message : "Unknown error";
       setError(message);
