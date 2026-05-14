@@ -130,8 +130,8 @@ export class ScrcpyServer extends EventEmitter {
   async start(options: ScrcpyServerOptions): Promise<void> {
     this.deviceSerial = options.deviceSerial;
 
-    // 1. Ensure jar is cached locally
-    const localJar = await getServerJarPath();
+    // 1. Get bundled jar path
+    const localJar = getServerJarPath();
 
     // 2. Push jar to device
     await adbPush(options.deviceSerial, localJar, REMOTE_JAR);
