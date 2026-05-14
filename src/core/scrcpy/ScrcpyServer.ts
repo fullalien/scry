@@ -1,11 +1,13 @@
 /**
  * ScrcpyServer: directly implements the scrcpy-server TCP protocol (v4.0).
  *
- * scrcpy-server v4.0 byte stream after TCP connect (tunnel_forward mode):
+ * scrcpy-server v4.0 byte stream after TCP connect (tunnel_forward, control=false):
  *
  *  Connection sequence:
- *   1. Server accepts video socket, immediately writes 1 byte 0x00 (dummy byte,
- *      for connection-error detection — sendDummyByte=true by default)
+ *   1. Server accepts ONE video socket, immediately writes 1 byte 0x00 (dummy
+ *      byte for connection-error detection — sendDummyByte=true by default).
+ *      With control=false, the server only accepts the video socket and
+ *      immediately proceeds — no second accept() for control.
  *   2. sendDeviceMeta: 64 bytes device name (null-padded UTF-8)
  *   3. Encoder starts, writeVideoHeader: 4 bytes codec_id
  *      (e.g. 0x68323634 = "h264")
@@ -121,17 +123,40 @@ class SocketReader {
 
 function tcpConnect(port: number): Promise<net.Socket> {
   return new Promise((resolve, reject) => {
-    const socket = net.createConnection({ port, host: "127.0.0.1" }, () =>
-      resolve(socket),
-    );
-    socket.once("error", reject);
+    const s = net.createConnection({ port, host: "127.0.0.1" });
+    s.once("error", reject);
+    s.once("connect", () => {
+      // The adb forwarder may accept the TCP connection but immediately close it
+      // when the abstract socket on the device side isn't listening yet.
+      // Wait up to 500ms: if the socket receives data or stays open → resolve;
+      // if it closes within that window → reject so the caller can retry.
+      let settled = false;
+      const settle = (fn: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        s.off("close", onClose);
+        s.off("error", onEarlyError);
+        s.off("data", onData);
+        fn();
+      };
+
+      const timer = setTimeout(() => settle(() => resolve(s)), 500);
+      const onClose = () => settle(() => reject(new Error("Socket closed immediately after connect")));
+      const onEarlyError = (err: Error) => settle(() => reject(err));
+      const onData = () => settle(() => resolve(s));
+
+      s.once("close", onClose);
+      s.once("error", onEarlyError);
+      s.once("data", onData);
+    });
   });
 }
 
 async function tcpConnectWithRetry(
   port: number,
-  maxAttempts = 15,
-  delayMs = 200,
+  maxAttempts = 40,
+  delayMs = 300,
 ): Promise<net.Socket> {
   let last: Error | undefined;
   for (let i = 0; i < maxAttempts; i++) {
@@ -152,7 +177,6 @@ function sleep(ms: number): Promise<void> {
 export class ScrcpyServer extends EventEmitter {
   private videoSocket!: net.Socket;
   private videoReader!: SocketReader;
-  private controlSocket!: net.Socket;
   private shellProcess!: ChildProcess;
   private _running = false;
   private deviceSerial = "";
@@ -194,11 +218,14 @@ export class ScrcpyServer extends EventEmitter {
       console.log("[ScrcpyServer] Jar already up-to-date on device, skipping push.");
     }
 
-    // 3. Set up port forward (remove any stale forward first)
+    // 3. Kill any stale scrcpy-server process on the device to avoid socket conflicts
+    await adbShell(options.deviceSerial, "pkill -f com.genymobile.scrcpy.Server 2>/dev/null; true").catch(() => {});
+
+    // 4. Set up port forward (remove any stale forward first)
     await adbForwardRemove(options.deviceSerial, FORWARD_PORT);
     await adbForward(options.deviceSerial, FORWARD_PORT, "scrcpy");
 
-    // 4. Launch the scrcpy Java server (runs indefinitely — do NOT await)
+    // 5. Launch the scrcpy Java server (runs indefinitely — do NOT await)
     this.shellProcess = adbShellSpawn(options.deviceSerial, [
       `CLASSPATH=${REMOTE_JAR}`,
       "app_process",
@@ -211,9 +238,13 @@ export class ScrcpyServer extends EventEmitter {
       `max_fps=${options.maxFps ?? 60}`,
       `video_bit_rate=${parseBitRate(options.videoBitRate)}`,
       "audio=false",
-      "control=true",
+      "control=false",
     ]);
 
+    this.shellProcess.stdout?.on("data", (chunk: Buffer) => {
+      const text = chunk.toString();
+      process.stderr.write(`[scrcpy-server:out] ${text}`);
+    });
     this.shellProcess.stderr?.on("data", (chunk: Buffer) => {
       const text = chunk.toString();
       process.stderr.write(`[scrcpy-server] ${text}`);
@@ -228,33 +259,33 @@ export class ScrcpyServer extends EventEmitter {
       }
     });
 
-    // 5. Connect and complete handshake (with retry while server boots)
+    // 6. Connect and complete handshake (with retry while server boots)
+    // Give the JVM a moment to start before the first connection attempt.
+    await sleep(800);
     await this.connectAndHandshake();
 
     this._running = true;
 
-    // 6. Start streaming packets in the background
+    // 7. Start streaming packets in the background
     void this.streamPackets();
   }
 
   private async connectAndHandshake(): Promise<void> {
-    // Video socket — retry until server is ready
+    // Video socket — retry until server is ready.
+    // tcpConnect resolves only when the connection stays open (not immediately closed).
     this.videoSocket = await tcpConnectWithRetry(FORWARD_PORT);
     this.videoReader = new SocketReader(this.videoSocket);
 
     // 1. Discard the 1-byte dummy (0x00) sent by the server (sendDummyByte=true default).
+    //    With control=false the server only accepts this one socket and immediately
+    //    proceeds to sendDeviceMeta — no second accept() needed.
     await this.readOrThrowShellError(1);
 
-    // 2. Connect control socket NOW — the server calls accept() for control immediately
-    //    after sending the dummy byte. Device meta is sent only AFTER all sockets are
-    //    accepted, so we must connect control before reading any more from video socket.
-    this.controlSocket = await tcpConnect(FORWARD_PORT);
-
-    // 3. Read 64-byte device name (null-padded UTF-8)
+    // 2. Read 64-byte device name (null-padded UTF-8)
     const deviceNameBuf = await this.readOrThrowShellError(64);
     const deviceName = deviceNameBuf.toString("utf8").replace(/\0/g, "");
 
-    // 4. Read 4-byte codec_id (e.g. 0x68323634 = "h264"), sent as sendStreamMeta header
+    // 3. Read 4-byte codec_id (e.g. 0x68323634 = "h264"), sent as sendStreamMeta header
     const codecBuf = await this.readOrThrowShellError(4);
     const codecId = codecBuf.toString("ascii").replace(/\0/g, "");
 
@@ -322,18 +353,13 @@ export class ScrcpyServer extends EventEmitter {
     }
   }
 
-  /** Send raw control bytes to the device. */
-  sendControl(data: Buffer | Uint8Array): void {
-    if (this._running && this.controlSocket) {
-      this.controlSocket.write(data);
-    }
-  }
+  /** @deprecated Control socket is not used in control=false mode. */
+  sendControl(_data: Buffer | Uint8Array): void {}
 
   stop(): void {
     if (!this._running) return;
     this._running = false;
     this.videoSocket?.destroy();
-    this.controlSocket?.destroy();
     this.shellProcess?.kill("SIGTERM");
     adbForwardRemove(this.deviceSerial, FORWARD_PORT).catch(() => {});
     this.emit("exit", 0, null);

@@ -72,6 +72,6 @@ export function adbShellSpawn(
   cmdArgs: string[],
 ): ReturnType<typeof spawn> {
   return spawn("adb", ["-s", deviceId, "shell", ...cmdArgs], {
-    stdio: ["ignore", "ignore", "pipe"],
+    stdio: ["ignore", "pipe", "pipe"],
   });
 }
