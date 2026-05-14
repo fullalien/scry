@@ -11,9 +11,10 @@ export const appConfigSchema = z.object({
   scrcpy: z.object({
     path: z.string().default("scrcpy"),
     maxSize: z.number().int().positive().optional(),
-    videoBitRate: z.string().default("8M"),
+    /** Video bit rate in bps (e.g. 4000000 = 4 Mbps). scrcpy v4+ requires a plain integer. */
+    videoBitRate: z.number().int().positive().default(4_000_000),
     maxFps: z.number().int().positive().optional(),
-  }).default({ path: "scrcpy", videoBitRate: "8M" }),
+  }).default({ path: "scrcpy", videoBitRate: 4_000_000 }),
   logs: z.object({
     level: z.enum(["debug", "info", "warn", "error"]).default("info"),
     file: z.string().default("~/.scrcpy-web/logs/app.log"),

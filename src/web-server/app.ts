@@ -8,7 +8,7 @@ import { listAdbDevices } from "../core/adb/AdbClient.js";
 import { ScrcpyManager } from "../core/scrcpy/ScrcpyManager.js";
 
 export type CreateWebServerOptions = {
-  scrcpyVideoBitRate?: string;
+  scrcpyVideoBitRate?: number;
   scrcpyMaxSize?: number;
   scrcpyMaxFps?: number;
 };
@@ -80,7 +80,7 @@ export async function createWebServer(options: CreateWebServerOptions) {
     const body = request.body as {
       deviceSerial?: string;
       maxSize?: number;
-      videoBitRate?: string;
+      videoBitRate?: number;
       maxFps?: number;
     } | null;
 
