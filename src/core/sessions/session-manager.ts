@@ -36,8 +36,8 @@ export type ListSessionsOptions = {
   status?: SessionStatus;
 };
 
-const STATE_DIR = process.env.SCRCPY_WEB_STATE_DIR
-  ? path.resolve(process.env.SCRCPY_WEB_STATE_DIR)
+const STATE_DIR = process.env['SCRCPY_WEB_STATE_DIR']
+  ? path.resolve(process.env['SCRCPY_WEB_STATE_DIR'])
   : path.join(homedir(), '.scrcpy-web');
 const STATE_FILE = path.join(STATE_DIR, 'sessions.json');
 const LEGACY_STATE_FILE = path.resolve(
@@ -46,7 +46,7 @@ const LEGACY_STATE_FILE = path.resolve(
   'sessions.json'
 );
 const STOPPED_SESSION_TTL_MS = parseInt(
-  process.env.STOPPED_SESSION_TTL_MS ?? '3600000',
+  process.env['STOPPED_SESSION_TTL_MS'] ?? '3600000',
   10
 ); // Default: 1 hour
 

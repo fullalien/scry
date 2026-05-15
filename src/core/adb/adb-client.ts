@@ -18,7 +18,7 @@ export async function listAdbDevices(): Promise<AdbDevice[]> {
     .filter(line => line.length > 0)
     .map(line => {
       const [id, state] = line.split(/\s+/);
-      return { id, state };
+      return { id: id ?? '', state: state ?? '' };
     });
 }
 

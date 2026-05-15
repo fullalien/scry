@@ -18,12 +18,12 @@
     "resources/"
   ],
   "scripts": {
-    "dev": "concurrently -n backend,frontend -c blue,green \"tsc --watch --preserveWatchOutput\" \"vite build --watch --config web/vite.config.ts\"",
+    "dev": "concurrently -n backend,frontend -c blue,green \"tsc --watch --preserveWatchOutput\" \"vite build --watch\"",
     "dev:devices": "tsx src/bin.ts devices",
     "dev:doctor": "tsx src/bin.ts doctor",
     "dev:logs": "tsx src/bin.ts logs --lines 50",
     "typecheck": "tsc --noEmit",
-    "build": "rm -rf dist && tsc && vite build --config web/vite.config.ts",
+    "build": "rm -rf dist && tsc && vite build",
     "start": "node dist/bin.js start",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
@@ -39,6 +39,7 @@
     "zod": "^3.24.4"
   },
   "devDependencies": {
+    "@sindresorhus/tsconfig": "^8.1.0",
     "@tailwindcss/vite": "^4.3.0",
     "@types/node": "^22.15.30",
     "@types/react": "^19.1.6",

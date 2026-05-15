@@ -24,7 +24,7 @@ export type CreateWebServerOptions = {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '../../');
-const webRoot = path.join(projectRoot, 'web');
+const webRoot = path.join(projectRoot, 'web', 'pages', 'home');
 
 export async function createWebServer(options: CreateWebServerOptions) {
   // Initialize the global logger
@@ -237,7 +237,7 @@ export async function createWebServer(options: CreateWebServerOptions) {
   });
 
   // Let @fastify/vite serve index.html and client assets.
-  app.get('/*', async (request, reply) => {
+  app.get('/*', async (_request, reply) => {
     return reply.html();
   });
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { ScrcpyH264Decoder, type DecoderStats } from './codec/h264.js';
-import './index.css';
+import { ScrcpyH264Decoder, type DecoderStats } from '../../../codec/h264.js';
+import './home.css';
 
 type HealthResponse = {
   ok: boolean;

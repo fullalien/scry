@@ -6,13 +6,21 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const projectRoot = path.resolve(__dirname, '..');
+const srcDir = path.resolve(__dirname, 'web', 'pages', 'home');
 
 export default defineConfig({
-  root: __dirname,
+  root: srcDir,
   plugins: [viteFastify({ spa: true }), react(), tailwindcss()],
   build: {
-    outDir: path.join(projectRoot, 'dist', 'web'),
+    target: 'esnext',
+    outDir: path.resolve(__dirname, 'dist'),
     emptyOutDir: true,
   },
+  environments: {
+    client: {
+      build: {
+        outDir: path.resolve(__dirname, 'dist', 'web'),
+      },
+    },
+  }
 });

@@ -18,8 +18,8 @@ function expandHome(filePath: string): string {
 }
 
 export function loadConfig(): AppConfig {
-  const configPath = process.env.SCRCPY_WEB_CONFIG_FILE
-    ? path.resolve(process.env.SCRCPY_WEB_CONFIG_FILE)
+  const configPath = process.env['SCRCPY_WEB_CONFIG_FILE']
+    ? path.resolve(process.env['SCRCPY_WEB_CONFIG_FILE'])
     : DEFAULT_CONFIG_PATH;
 
   let fileConfig: Record<string, unknown> = {};
@@ -37,23 +37,23 @@ export function loadConfig(): AppConfig {
 
   const merged = appConfigSchema.parse(fileConfig);
 
-  if (process.env.SCRCPY_WEB_HOST) {
-    merged.server.host = process.env.SCRCPY_WEB_HOST;
+  if (process.env['SCRCPY_WEB_HOST']) {
+    merged.server.host = process.env['SCRCPY_WEB_HOST'];
   }
 
-  if (process.env.SCRCPY_WEB_PORT) {
-    const port = Number(process.env.SCRCPY_WEB_PORT);
+  if (process.env['SCRCPY_WEB_PORT']) {
+    const port = Number(process.env['SCRCPY_WEB_PORT']);
     if (Number.isInteger(port) && port > 0 && port <= 65535) {
       merged.server.port = port;
     }
   }
 
-  if (process.env.SCRCPY_WEB_ADB_PATH) {
-    merged.adb.path = process.env.SCRCPY_WEB_ADB_PATH;
+  if (process.env['SCRCPY_WEB_ADB_PATH']) {
+    merged.adb.path = process.env['SCRCPY_WEB_ADB_PATH'];
   }
 
-  if (process.env.SCRCPY_WEB_SCRCPY_PATH) {
-    merged.scrcpy.path = process.env.SCRCPY_WEB_SCRCPY_PATH;
+  if (process.env['SCRCPY_WEB_SCRCPY_PATH']) {
+    merged.scrcpy.path = process.env['SCRCPY_WEB_SCRCPY_PATH'];
   }
 
   merged.logs.file = expandHome(merged.logs.file);

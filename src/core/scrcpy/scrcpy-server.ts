@@ -26,10 +26,8 @@ const FORWARD_PORT = 27183;
 const DEFAULT_SCID = 0;
 
 // scrcpy-server v4.0 packet flags (matching Streamer.java).
-const PKT_FLAG_SESSION = 0x8000000000000000n; // bit 63
 const PKT_FLAG_CONFIG = 0x4000000000000000n; // bit 62
 const PKT_FLAG_KEY_FRAME = 0x2000000000000000n; // bit 61
-const PKT_PTS_MASK = 0x1fffffffffffffffn; // lower 61 bits
 const NAL_IDR = 5;
 const VIDEO_MSG_TYPE = 0x01;
 
@@ -84,7 +82,7 @@ function parseBitRate(
   if (typeof value === 'number') return value;
   const match = /^(\d+(?:\.\d+)?)\s*([KkMmGg])?$/.exec(value.trim());
   if (!match) return defaultBps;
-  const n = parseFloat(match[1]);
+  const n = parseFloat(match[1] ?? '');
   const suffix = (match[2] ?? '').toUpperCase();
   if (suffix === 'K') return Math.round(n * 1_000);
   if (suffix === 'M') return Math.round(n * 1_000_000);
@@ -104,12 +102,12 @@ class SocketReader {
     reject: (e: Error) => void;
   }> = [];
 
-  constructor(private readonly socket: net.Socket) {
+  constructor(socket: net.Socket) {
     socket.on('data', (chunk: Buffer) => {
       this.buf = Buffer.concat([this.buf, chunk]);
       this.drain();
     });
-    socket.on('error', err => {
+    socket.on('error', (err: Error) => {
       for (const p of this.pending) p.reject(err);
       this.pending.length = 0;
     });
@@ -133,7 +131,7 @@ class SocketReader {
   }
 
   private drain(): void {
-    while (this.pending.length > 0 && this.buf.length >= this.pending[0].n) {
+    while (this.pending.length > 0 && this.buf.length >= this.pending[0]!.n) {
       const { n, resolve } = this.pending.shift()!;
       resolve(this.buf.subarray(0, n));
       this.buf = this.buf.subarray(n);
@@ -218,7 +216,7 @@ function findNalType(data: Buffer, wantedType?: number): number | undefined {
     }
 
     if (headerOff !== -1 && headerOff < data.length) {
-      const nalType = data[headerOff] & 0x1f;
+      const nalType = data[headerOff]! & 0x1f;
       if (wantedType === undefined || nalType === wantedType) {
         return nalType;
       }
@@ -465,17 +463,16 @@ export class ScrcpyServer extends EventEmitter {
     let pktNum = 0;
     try {
       while (this._running) {
-        const headerOffset = streamOffset;
         const header = await this.videoReader.read(12);
         streamOffset += 12;
         pktNum++;
 
-        const firstByte = header[0];
+        const firstByte = header[0]!;
         const isSession = (firstByte & 0x80) !== 0;
 
         // Session packet: 4-byte flags + 4-byte width + 4-byte height (no payload).
         if (isSession) {
-          const flags = header.readUInt32BE(0);
+          void header.readUInt32BE(0);
           const width = header.readUInt32BE(4);
           const height = header.readUInt32BE(8);
           this.stats.sessionMeta += 1;

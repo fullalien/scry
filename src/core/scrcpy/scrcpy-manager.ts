@@ -31,7 +31,7 @@ export type StopScrcpyResult = 'stopped' | 'not-found' | 'already-stopped';
 type ScrcpyEntry = { session: ScrcpySession; process: ScrcpyServer };
 
 const STOPPED_SESSION_TTL_MS = parseInt(
-  process.env.STOPPED_SCRCPY_SESSION_TTL_MS ?? '3600000',
+  process.env['STOPPED_SCRCPY_SESSION_TTL_MS'] ?? '3600000',
   10
 ); // Default: 1 hour
 
