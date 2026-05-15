@@ -1,10 +1,14 @@
 import type { Command } from "commander";
-import { stopAllSessions, stopSession } from "../../core/sessions/SessionManager.js";
-import { loadConfig } from "../config/loadConfig.js";
-import { appendCliLog } from "../output/logger.js";
+import { stopAllSessions, stopSession } from "../../core/sessions/session-manager.js";
+import { loadConfig } from "../config/load-config.js";
+import { initLogger, getLogger } from "../../core/logger/logger.js";
 
 export function registerStopCommand(program: Command) {
   const config = loadConfig();
+  initLogger({
+    level: config.logs.level,
+    file: config.logs.file,
+  });
 
   program
     .command("stop")
@@ -16,8 +20,8 @@ export function registerStopCommand(program: Command) {
       const id = options.session as string | undefined;
 
       if (!stopAll && !id) {
-        console.log("Provide --session <id> or --all");
-        appendCliLog(config.logs.file, {
+        getLogger().error("Provide --session <id> or --all");
+        getLogger().appendCliLog({
           level: "error",
           command: "stop",
           msg: "Invalid stop arguments",
@@ -28,13 +32,13 @@ export function registerStopCommand(program: Command) {
 
       if (stopAll) {
         const result = stopAllSessions();
-        console.log(
+        getLogger().info(
           `Stop all finished: stopped=${result.stopped.length}, already-stopped=${result.alreadyStopped.length}, failed=${result.failed.length}`,
         );
         if (result.failed.length > 0) {
           process.exitCode = 1;
         }
-        appendCliLog(config.logs.file, {
+        getLogger().appendCliLog({
           level: result.failed.length > 0 ? "warn" : "info",
           command: "stop",
           msg: "Stop all executed",
@@ -47,8 +51,8 @@ export function registerStopCommand(program: Command) {
       const result = stopSession(targetId);
 
       if (result === "not-found") {
-        console.log(`Session not found: ${targetId}`);
-        appendCliLog(config.logs.file, {
+        getLogger().warn(`Session not found: ${targetId}`);
+        getLogger().appendCliLog({
           level: "warn",
           command: "stop",
           session: targetId,
@@ -59,8 +63,8 @@ export function registerStopCommand(program: Command) {
       }
 
       if (result === "already-stopped") {
-        console.log(`Session already stopped: ${targetId}`);
-        appendCliLog(config.logs.file, {
+        getLogger().info(`Session already stopped: ${targetId}`);
+        getLogger().appendCliLog({
           level: "info",
           command: "stop",
           session: targetId,
@@ -70,8 +74,8 @@ export function registerStopCommand(program: Command) {
       }
 
       if (result === "failed") {
-        console.log(`Failed to stop session: ${targetId}`);
-        appendCliLog(config.logs.file, {
+        getLogger().error(`Failed to stop session: ${targetId}`);
+        getLogger().appendCliLog({
           level: "error",
           command: "stop",
           session: targetId,
@@ -81,8 +85,8 @@ export function registerStopCommand(program: Command) {
         return;
       }
 
-      console.log(`Stopped session: ${targetId}`);
-      appendCliLog(config.logs.file, {
+      getLogger().info(`Stopped session: ${targetId}`);
+      getLogger().appendCliLog({
         level: "info",
         command: "stop",
         session: targetId,

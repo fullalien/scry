@@ -41,6 +41,7 @@ type AppData = {
   sessions: Session[];
   devices: AdbDevice[];
   scrcpySessions: ScrcpySession[];
+  devicesOk: boolean;
 };
 
 
@@ -89,18 +90,11 @@ function VideoCanvas({ sessionId }: { sessionId: string }) {
     const wsProto = location.protocol === "https:" ? "wss:" : "ws:";
     const ws = new WebSocket(`${wsProto}//${location.host}/ws/stream/${sessionId}`);
     ws.binaryType = "arraybuffer";
-    console.log("[WS Client] Connecting to", ws.url);
 
-    ws.onopen = () => console.log("[WS Client] Connected");
     ws.onmessage = (e: MessageEvent<ArrayBuffer | string>) => {
-      console.log(`[WS Client] onmessage: type=${typeof e.data}, isArrayBuffer=${e.data instanceof ArrayBuffer}`);
       if (typeof e.data === "string") {
-        console.log(`[WS Client] Got text: ${e.data}`);
         return;
       }
-      console.log(`[WS Client] byteLength=${e.data.byteLength}`);
-      const arr = new Uint8Array(e.data);
-      console.log(`[WS Client] first bytes: ${arr.slice(0,12).map(b=>b.toString(16).padStart(2,'0')).join(' ')}`);
       decoder.push(e.data);
     };
 
@@ -162,14 +156,15 @@ async function fetchAppData(): Promise<AppData> {
 
   const health = (await healthRes.json()) as HealthResponse;
   const { sessions } = (await sessionsRes.json()) as { sessions: Session[] };
-  const { devices } = devicesRes.ok
+  const devicesOk = devicesRes.ok;
+  const { devices } = devicesOk
     ? ((await devicesRes.json()) as { devices: AdbDevice[] })
     : { devices: [] };
   const { sessions: scrcpySessions } = scrcpyRes.ok
     ? ((await scrcpyRes.json()) as { sessions: ScrcpySession[] })
     : { sessions: [] };
 
-  return { health, sessions, devices, scrcpySessions };
+  return { health, sessions, devices, scrcpySessions, devicesOk };
 }
 
 // Cached outside the component so React StrictMode remounts don't cause a null flash.
@@ -196,11 +191,12 @@ function App() {
     void loadAll();
   }, [loadAll]);
 
-  const { health, sessions, devices, scrcpySessions } = data ?? {
+  const { health, sessions, devices, scrcpySessions, devicesOk } = data ?? {
     health: null as HealthResponse | null,
     sessions: [] as Session[],
     devices: [] as AdbDevice[],
     scrcpySessions: [] as ScrcpySession[],
+    devicesOk: false,
   };
 
   async function startScrcpy(deviceSerial: string) {
@@ -271,7 +267,7 @@ function App() {
           </button>
         </h2>
         {devices.length === 0 ? (
-          <p>No ADB devices found.</p>
+          <p>{devicesOk ? "No ADB devices connected." : "Failed to query ADB devices."}</p>
         ) : (
           <ul style={{ listStyle: "none", padding: 0 }}>
             {devices.map((device) => {

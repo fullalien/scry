@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { listSessions } from "../../core/sessions/SessionManager.js";
+import { listSessions } from "../../core/sessions/session-manager.js";
 
 export function registerSessionsCommand(program: Command) {
   program

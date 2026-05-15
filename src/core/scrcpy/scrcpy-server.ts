@@ -17,8 +17,9 @@ import {
   adbForward,
   adbForwardRemove,
   adbShellSpawn,
-} from "../adb/AdbClient.js";
-import { getServerJarPath, SERVER_VERSION } from "./ServerJar.js";
+} from "../adb/adb-client.js";
+import { getServerJarPath, SERVER_VERSION } from "./server-jar.js";
+import { getLogger } from "../logger/logger.js";
 
 const REMOTE_JAR = "/data/local/tmp/scrcpy-server-v4.0.jar";
 const FORWARD_PORT = 27183;
@@ -289,10 +290,10 @@ export class ScrcpyServer extends EventEmitter {
     })();
 
     if (needsPush) {
-      console.log(`[ScrcpyServer] Pushing jar (${localJarSize} bytes)…`);
+      getLogger().info(`[ScrcpyServer] Pushing jar (${localJarSize} bytes)…`);
       await adbPush(options.deviceSerial, localJar, REMOTE_JAR);
     } else {
-      console.log("[ScrcpyServer] Jar already up-to-date on device, skipping push.");
+      getLogger().info("[ScrcpyServer] Jar already up-to-date on device, skipping push.");
     }
 
     // 3. Kill any stale scrcpy-server process on the device to avoid socket conflicts
@@ -390,7 +391,7 @@ export class ScrcpyServer extends EventEmitter {
       throw new Error("[ScrcpyServer] Device reported video codec configuration error (codec_id=1)");
     }
 
-    console.log(
+    getLogger().info(
       `[ScrcpyServer] Connected (${socketName}) — device: "${deviceName}", video codec: "${codecIdToText(
         videoCodecId,
       )}" ${videoWidth}x${videoHeight}`,
@@ -402,11 +403,11 @@ export class ScrcpyServer extends EventEmitter {
       const audioCodecMeta = await audioReader.read(4);
       const audioCodecId = audioCodecMeta.readUInt32BE(0);
       if (audioCodecId === 0x00000000) {
-        console.warn("[ScrcpyServer] Device disabled audio stream (codec_id=0)");
+        getLogger().warn("[ScrcpyServer] Device disabled audio stream (codec_id=0)");
       } else if (audioCodecId === 0x00000001) {
-        console.warn("[ScrcpyServer] Device reported audio codec configuration error (codec_id=1)");
+        getLogger().warn("[ScrcpyServer] Device reported audio codec configuration error (codec_id=1)");
       } else {
-        console.log(`[ScrcpyServer] Audio codec: "${codecIdToText(audioCodecId)}"`);
+        getLogger().info(`[ScrcpyServer] Audio codec: "${codecIdToText(audioCodecId)}"`);
       }
       audioSocket.destroy();
     }
@@ -453,7 +454,6 @@ export class ScrcpyServer extends EventEmitter {
           const height = header.readUInt32BE(8);
           this.stats.sessionMeta += 1;
           this.stats.lastHeader = `session ${width}x${height}`;
-          console.log(`[ScrcpyServer] [DBG] pkt#${pktNum}: SESSION ${width}×${height} (flags=0x${flags.toString(16)}) → skip`);
           continue;
         }
 
@@ -463,27 +463,12 @@ export class ScrcpyServer extends EventEmitter {
         const isConfig = (ptsAndFlags & PKT_FLAG_CONFIG) !== 0n;
         const isKey = (ptsAndFlags & PKT_FLAG_KEY_FRAME) !== 0n;
 
-        console.log(
-          `[ScrcpyServer] [DBG] pkt#${pktNum} @offset=${headerOffset}: ` +
-          `hdr=${header.toString("hex")} pts=0x${ptsAndFlags.toString(16)} ` +
-          `size=${size} CONFIG=${isConfig} KEY=${isKey}`,
-        );
-
         if (size > 16 * 1024 * 1024) {
-          console.error(
-            `[ScrcpyServer] [DBG] INVALID SIZE at offset=${headerOffset}: size=${size} (0x${size.toString(16)}), ` +
-            `hdr bytes: ${header.toString("hex")}`,
-          );
           throw new Error(`[ScrcpyServer] Invalid video packet size ${size}`);
         }
 
         const data = size > 0 ? await this.videoReader.read(size) : Buffer.alloc(0);
         streamOffset += size;
-        const firstBytes = data.subarray(0, Math.min(24, data.length)).toString("hex");
-        console.log(
-          `[ScrcpyServer] [DBG] pkt#${pktNum}: data read OK, ${size} bytes, first24=${firstBytes}, ` +
-          `nextOffset=${streamOffset}`,
-        );
 
         const isKeyFrame = isKey || hasIdrNal(data);
 
@@ -500,13 +485,9 @@ export class ScrcpyServer extends EventEmitter {
         if (isConfig) {
           this.stats.configs += 1;
           this.latestCodecConfigFrame = frame;
-          console.log(`[ScrcpyServer] [DBG] pkt#${pktNum}: CONFIG stored (total configs=${this.stats.configs})`);
         } else if (isKeyFrame) {
           this.stats.keyframes += 1;
           this.latestKeyFrame = frame;
-          console.log(`[ScrcpyServer] [DBG] pkt#${pktNum}: KEYFRAME stored (total keyframes=${this.stats.keyframes})`);
-        } else {
-          console.log(`[ScrcpyServer] [DBG] pkt#${pktNum}: delta frame`);
         }
 
         this.emit("data", frame);

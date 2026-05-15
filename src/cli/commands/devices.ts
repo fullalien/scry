@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { listAdbDevices } from "../../core/adb/AdbClient.js";
+import { listAdbDevices } from "../../core/adb/adb-client.js";
 
 export function registerDevicesCommand(program: Command) {
   program

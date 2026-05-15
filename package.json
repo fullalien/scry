@@ -10,13 +10,12 @@
     "scrcpy-web": "dist/bin.js"
   },
   "scripts": {
-    "dev": "npm run build:web && tsx src/bin.ts start",
+    "dev": "concurrently -n backend,frontend -c blue,green \"tsc --watch --preserveWatchOutput\" \"vite build --watch --config web/vite.config.ts\"",
     "dev:devices": "tsx src/bin.ts devices",
     "dev:doctor": "tsx src/bin.ts doctor",
     "dev:logs": "tsx src/bin.ts logs --lines 50",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "build:web": "vite build --config web/vite.config.ts",
-    "build": "npm run build:web && tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "build": "rm -rf dist && tsc && vite build --config web/vite.config.ts",
     "start": "node dist/bin.js start"
   },
   "dependencies": {
@@ -34,6 +33,7 @@
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.5",
     "@vitejs/plugin-react": "^4.5.1",
+    "concurrently": "^9.1.2",
     "rollup": "^4.60.3",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3",

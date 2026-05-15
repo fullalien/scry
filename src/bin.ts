@@ -6,7 +6,7 @@ import { registerDoctorCommand } from "./cli/commands/doctor.js";
 import { registerSessionsCommand } from "./cli/commands/sessions.js";
 import { registerStopCommand } from "./cli/commands/stop.js";
 import { registerLogsCommand } from "./cli/commands/logs.js";
-import { loadConfig } from "./cli/config/loadConfig.js";
+import { loadConfig } from "./cli/config/load-config.js";
 
 async function main() {
   const program = new Command();

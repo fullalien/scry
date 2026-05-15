@@ -37,6 +37,9 @@ const STATE_DIR = process.env.SCRCPY_WEB_STATE_DIR
   : path.join(homedir(), ".scrcpy-web");
 const STATE_FILE = path.join(STATE_DIR, "sessions.json");
 const LEGACY_STATE_FILE = path.resolve(process.cwd(), ".scrcpy-web", "sessions.json");
+const STOPPED_SESSION_TTL_MS = parseInt(process.env.STOPPED_SESSION_TTL_MS ?? "3600000", 10); // Default: 1 hour
+
+let cleanupIntervalId: NodeJS.Timeout | null = null;
 
 function migrateLegacyStateFileIfNeeded(): void {
   if (existsSync(STATE_FILE) || !existsSync(LEGACY_STATE_FILE)) {
@@ -91,9 +94,36 @@ function refreshSessionStates(sessions: Map<string, Session>): void {
   }
 }
 
+function cleanupStoppedSessions(sessions: Map<string, Session>): void {
+  const now = Date.now();
+  for (const [id, session] of sessions.entries()) {
+    if (session.status === "stopped" && (now - session.updatedAt) > STOPPED_SESSION_TTL_MS) {
+      sessions.delete(id);
+    }
+  }
+}
+
+export function startAutoCleanup(intervalMs = 300000): void { // Default: 5 minutes
+  if (cleanupIntervalId) return;
+  cleanupStoppedSessions(readSessionsMap());
+  cleanupIntervalId = setInterval(() => {
+    const sessions = readSessionsMap();
+    cleanupStoppedSessions(sessions);
+    writeSessionsMap(sessions);
+  }, intervalMs);
+}
+
+export function stopAutoCleanup(): void {
+  if (cleanupIntervalId) {
+    clearInterval(cleanupIntervalId);
+    cleanupIntervalId = null;
+  }
+}
+
 export function listSessions(options?: ListSessionsOptions): Session[] {
   const sessions = readSessionsMap();
   refreshSessionStates(sessions);
+  cleanupStoppedSessions(sessions);
   writeSessionsMap(sessions);
   const values = [...sessions.values()].sort((a, b) => b.createdAt - a.createdAt);
   if (!options?.status) {

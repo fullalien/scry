@@ -125,7 +125,6 @@ export class ScrcpyH264Decoder {
       console.error("[H264] Decoder error:", e),
     private readonly onStats: DecoderStatsHandler = () => {},
   ) {
-    console.log("[H264] ScrcpyH264Decoder created, VideoDecoder supported:", "VideoDecoder" in window);
   }
 
   /** Feed one raw WebSocket binary message. */
@@ -151,19 +150,14 @@ export class ScrcpyH264Decoder {
     this.stats.packets += 1;
 
     if (isConfig) {
-      const first20 = Array.from(new Uint8Array(buffer, 9, Math.min(20, dataLen))).map(n => n.toString(16).padStart(2, '0')).join(' ');
-      console.log(`[H264] CONFIG packet, dataLen=${dataLen}, first bytes: ${first20}`);
       this.handleCodecConfig(new Uint8Array(buffer, dataOff));
     } else {
-      console.log(`[H264] FRAME: size=${size}, pts=${pts}, isKey=${(ptsAndFlags & PACKET_FLAG_KEY_FRAME) !== 0n}, dataLen=${dataLen}`);
       this.handleFrame(pts, ptsAndFlags, new Uint8Array(buffer, dataOff));
     }
   }
 
   private handleCodecConfig(data: Uint8Array): void {
-    console.log(`[H264] handleCodecConfig: data length=${data.length}`);
     const codec = extractCodecString(data);
-    console.log(`[H264] Extracted codec: ${codec}`);
     this.stats.configs += 1;
     this.stats.codec = codec;
 
@@ -173,23 +167,19 @@ export class ScrcpyH264Decoder {
     this.decoder?.close();
     this.decoder = new VideoDecoder({
       output: (frame) => {
-        console.log(`[H264] Output: ${frame.displayWidth}x${frame.displayHeight}, timestamp=${frame.timestamp}`);
         this.stats.decoded += 1;
         this.onFrame(frame);
       },
       error: (e) => {
-        console.log(`[H264] Decoder error:`, e);
         this.onError(new Error(String(e)));
       },
     });
 
-    console.log(`[H264] configure: codec=${codec}`);
     try {
       this.decoder.configure({
         codec,
         optimizeForLatency: true,
       });
-      console.log(`[H264] configure success, state=${this.decoder.state}`);
       this.emitStats();
     } catch (e) {
       console.log(`[H264] configure failed:`, e);
@@ -201,7 +191,6 @@ export class ScrcpyH264Decoder {
 
   private handleFrame(pts: bigint, ptsAndFlags: bigint, data: Uint8Array): void {
     if (!this.configured || !this.decoder) {
-      console.log(`[H264] handleFrame: not configured yet, dropping`);
       return;
     }
     this.stats.frames += 1;
@@ -213,7 +202,6 @@ export class ScrcpyH264Decoder {
     this.stats.waitingForKeyframe = this.waitingForKeyframe;
 
     if (!isKey && this.waitingForKeyframe) {
-      console.log(`[H264] handleFrame: waiting for keyframe, dropping`);
       return;
     }
     this.waitingForKeyframe = false;

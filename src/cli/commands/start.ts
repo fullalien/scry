@@ -5,8 +5,8 @@ import {
   findRunningSessionByAddress,
   markSessionStopped,
   registerSession,
-} from "../../core/sessions/SessionManager.js";
-import { appendCliLog } from "../output/logger.js";
+} from "../../core/sessions/session-manager.js";
+import { initLogger, getLogger } from "../../core/logger/logger.js";
 import type { AppConfig } from "../config/schema.js";
 
 export function registerStartCommand(program: Command, config: AppConfig) {
@@ -17,6 +17,12 @@ export function registerStartCommand(program: Command, config: AppConfig) {
     .option("--port <port>", "Port", String(config.server.port))
     .option("--session-name <name>", "Optional human-readable session name")
     .action(async (options) => {
+      // Initialize logger early so all subsequent operations are logged
+      initLogger({
+        level: config.logs.level,
+        file: config.logs.file,
+      });
+
       const host = options.host as string;
       const port = Number(options.port);
       const sessionName = options.sessionName as string | undefined;
@@ -24,10 +30,10 @@ export function registerStartCommand(program: Command, config: AppConfig) {
 
       const existing = findRunningSessionByAddress(host, port);
       if (existing) {
-        console.error(
+        getLogger().error(
           `Another running session is already bound to ${host}:${port} (session=${existing.id}).`,
         );
-        appendCliLog(config.logs.file, {
+        getLogger().appendCliLog({
           level: "error",
           command: "start",
           session: existing.id,
@@ -42,6 +48,10 @@ export function registerStartCommand(program: Command, config: AppConfig) {
         scrcpyVideoBitRate: config.scrcpy.videoBitRate,
         scrcpyMaxSize: config.scrcpy.maxSize,
         scrcpyMaxFps: config.scrcpy.maxFps,
+        logger: {
+          level: config.logs.level,
+          file: config.logs.file,
+        },
       });
       await server.listen({ host, port });
 
@@ -66,7 +76,7 @@ export function registerStartCommand(program: Command, config: AppConfig) {
         }
         stopping = true;
         markSessionStopped(sessionId);
-        appendCliLog(config.logs.file, {
+        getLogger().appendCliLog({
           level: "info",
           command: "start",
           session: sessionId,
@@ -86,10 +96,10 @@ export function registerStartCommand(program: Command, config: AppConfig) {
         markSessionStopped(sessionId);
       });
 
-      server.log.info(
+      getLogger().info(
         `scrcpy-web started at http://${host}:${port} (session=${sessionId}${sessionName ? `, name=${sessionName}` : ""})`,
       );
-      appendCliLog(config.logs.file, {
+      getLogger().appendCliLog({
         level: "info",
         command: "start",
         session: sessionId,

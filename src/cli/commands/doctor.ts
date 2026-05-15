@@ -3,7 +3,7 @@ import { execFile } from "node:child_process";
 import net from "node:net";
 import { promisify } from "node:util";
 import type { AppConfig } from "../config/schema.js";
-import { appendCliLog } from "../output/logger.js";
+import { initLogger, getLogger } from "../../core/logger/logger.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -30,6 +30,11 @@ export function registerDoctorCommand(program: Command, config: AppConfig) {
     .option("--host <host>", "Host for port check", config.server.host)
     .option("--port <port>", "Port for port check", String(config.server.port))
     .action(async (options) => {
+      initLogger({
+        level: config.logs.level,
+        file: config.logs.file,
+      });
+
       const host = options.host as string;
       const port = Number(options.port);
       let adbOk = false;
@@ -52,13 +57,13 @@ export function registerDoctorCommand(program: Command, config: AppConfig) {
 
       portAvailable = await isPortAvailable(host, port);
 
-      console.log(`Node.js: ${process.version}`);
-      console.log(`adb: ${adbOk ? "ok" : "missing"}`);
-      console.log(`scrcpy: ${scrcpyOk ? "ok" : "missing"}`);
-      console.log(`port ${host}:${port}: ${portAvailable ? "available" : "in use"}`);
-      console.log("WebCodecs: check in browser runtime (feature-detect in client)");
+      getLogger().info(`Node.js: ${process.version}`);
+      getLogger().info(`adb: ${adbOk ? "ok" : "missing"}`);
+      getLogger().info(`scrcpy: ${scrcpyOk ? "ok" : "missing"}`);
+      getLogger().info(`port ${host}:${port}: ${portAvailable ? "available" : "in use"}`);
+      getLogger().info("WebCodecs: check in browser runtime (feature-detect in client)");
 
-      appendCliLog(config.logs.file, {
+      getLogger().appendCliLog({
         level: "info",
         command: "doctor",
         msg: "Doctor checks completed",
