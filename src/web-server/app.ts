@@ -19,7 +19,7 @@ const projectRoot = path.resolve(__dirname, "../../");
 const webRoot = path.join(projectRoot, "web");
 
 export async function createWebServer(options: CreateWebServerOptions) {
-  const app = Fastify({ logger: true });
+  const app = Fastify({ logger: false });
 
   const scrcpyManager = new ScrcpyManager();
 
@@ -134,9 +134,27 @@ export async function createWebServer(options: CreateWebServerOptions) {
         return;
       }
 
+      const pendingFrames: Buffer[] = [];
+      let flushed = false;
+
+      const flushPending = () => {
+        if (flushed || socket.readyState !== socket.OPEN) return;
+        flushed = true;
+        console.log(`[WS] Flushing ${pendingFrames.length} pending frames for session ${id}`);
+        for (const frame of pendingFrames) {
+          console.log(`[WS] Sending frame: type=${frame[0]}, size=${frame.length}`);
+          socket.send(frame);
+        }
+        pendingFrames.length = 0;
+      };
+
       const onData = (chunk: Buffer) => {
-        if (socket.readyState === socket.OPEN) {
+        console.log(`[WS] onData: flushed=${flushed}, readyState=${socket.readyState}, chunkSize=${chunk.length}`);
+        if (flushed && socket.readyState === socket.OPEN) {
+          console.log(`[WS] Sending frame directly: type=${chunk[0]}, size=${chunk.length}`);
           socket.send(chunk);
+        } else {
+          pendingFrames.push(chunk);
         }
       };
 
@@ -146,8 +164,47 @@ export async function createWebServer(options: CreateWebServerOptions) {
         }
       };
 
+      const onDeviceMessage = (msg: unknown) => {
+        if (socket.readyState !== socket.OPEN) {
+          return;
+        }
+
+        // Device messages are sent as JSON envelopes to avoid colliding with video binary frames.
+        socket.send(
+          JSON.stringify({
+            type: "device-message",
+            payload:
+              typeof msg === "object" && msg !== null && "type" in (msg as Record<string, unknown>)
+                ? {
+                    ...(msg as Record<string, unknown>),
+                    ...(Buffer.isBuffer((msg as { data?: unknown }).data)
+                      ? { data: ((msg as { data: Buffer }).data).toString("base64") }
+                      : {}),
+                  }
+                : msg,
+          }),
+        );
+      };
+
       proc.on("data", onData);
       proc.on("exit", onExit);
+      proc.on("device-message", onDeviceMessage);
+
+      const codecConfigFrame = proc.getLatestCodecConfigFrame();
+      const keyFrame = proc.getLatestKeyFrame();
+
+      // Must prepend in reverse order via unshift: codec config first, then keyframe.
+      if (keyFrame) {
+        pendingFrames.unshift(keyFrame);
+      }
+      if (codecConfigFrame) {
+        pendingFrames.unshift(codecConfigFrame);
+      }
+
+      if (socket.readyState === socket.OPEN) {
+        flushPending();
+      }
+      socket.on("open", flushPending);
 
       socket.on("message", (msg: Buffer) => {
         // Forward raw control messages from browser to the device
@@ -157,6 +214,7 @@ export async function createWebServer(options: CreateWebServerOptions) {
       socket.on("close", () => {
         proc.off("data", onData);
         proc.off("exit", onExit);
+        proc.off("device-message", onDeviceMessage);
       });
     },
   );
@@ -176,4 +234,3 @@ export async function createWebServer(options: CreateWebServerOptions) {
 
   return app;
 }
-

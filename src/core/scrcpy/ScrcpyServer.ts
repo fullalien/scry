@@ -1,34 +1,10 @@
 /**
  * ScrcpyServer: directly implements the scrcpy-server TCP protocol (v4.0).
  *
- * scrcpy-server v4.0 byte stream after TCP connect (tunnel_forward, control=false):
- *
- *  Connection sequence:
- *   1. Server accepts ONE video socket, immediately writes 1 byte 0x00 (dummy
- *      byte for connection-error detection — sendDummyByte=true by default).
- *      With control=false, the server only accepts the video socket and
- *      immediately proceeds — no second accept() for control.
- *   2. sendDeviceMeta: 64 bytes device name (null-padded UTF-8)
- *   3. Encoder starts, writeVideoHeader: 4 bytes codec_id
- *      (e.g. 0x68323634 = "h264")
- *   4. Then a stream of "packets":
- *
- *  Packet disambiguation (read 4 bytes hi-word first):
- *   - If hi-word == 0x80000000 (PACKET_FLAG_SESSION >> 32):
- *       → session/resize meta: [hi:4B already read][width:4B][height:4B] = 12B total, no data
- *   - Otherwise: regular data packet
- *       → read 4 bytes lo-word → ptsAndFlags = (hi<<32)|lo (8B)
- *       → read 4 bytes size
- *       → read size bytes data
- *       → if ptsAndFlags & PACKET_FLAG_CONFIG (0x4000…): codec config (SPS+PPS)
- *       → else: video frame (may have PACKET_FLAG_KEY_FRAME bit)
- *
- *  WS frame format emitted on the "data" event (our protocol, browser side):
- *   byte 0     : 0x01  (message type = video)
- *   bytes 1–8  : PTS big-endian uint64
- *                  0x8000_0000_0000_0000  → codec config (SPS + PPS)
- *                  anything else          → video frame PTS in microseconds
- *   bytes 9+   : raw NAL data (Annex-B)
+ * WS frame format emitted on the "data" event (our internal protocol):
+ *   byte 0     : 0x01 (video)
+ *   bytes 1-8  : pts_flags big-endian uint64 (unchanged from server)
+ *   bytes 9+   : encoded payload bytes
  */
 
 import fs from "node:fs";
@@ -44,24 +20,59 @@ import {
 } from "../adb/AdbClient.js";
 import { getServerJarPath, SERVER_VERSION } from "./ServerJar.js";
 
-const REMOTE_JAR = "/data/local/tmp/scrcpy-server.jar";
+const REMOTE_JAR = "/data/local/tmp/scrcpy-server-v4.0.jar";
 const FORWARD_PORT = 27183;
+const DEFAULT_SCID = 0;
 
-// scrcpy-server v4.0 Streamer.java packet flags
-const PKT_FLAG_SESSION_HI = 0x80000000; // high 32 bits of PACKET_FLAG_SESSION (1L<<63)
-const PKT_FLAG_CONFIG     = 0x4000000000000000n; // PACKET_FLAG_CONFIG (1L<<62)
-const PKT_FLAG_KEY_FRAME  = 0x2000000000000000n; // PACKET_FLAG_KEY_FRAME (1L<<61)
+// scrcpy-server v4.0 packet flags (matching Streamer.java).
+const PKT_FLAG_SESSION = 0x8000000000000000n;   // bit 63
+const PKT_FLAG_CONFIG = 0x4000000000000000n;     // bit 62
+const PKT_FLAG_KEY_FRAME = 0x2000000000000000n;  // bit 61
+const PKT_PTS_MASK = 0x1fffffffffffffffn;         // lower 61 bits
+const NAL_IDR = 5;
+const VIDEO_MSG_TYPE = 0x01;
 
-// Our WS protocol constant for codec config (SPS+PPS) packets
-const WS_CODEC_CONFIG_PTS = 0x8000000000000000n;
+const DEVICE_MSG_TYPE_CLIPBOARD = 0x00;
+const DEVICE_MSG_TYPE_ACK_CLIPBOARD = 0x01;
+const DEVICE_MSG_TYPE_UHID_OUTPUT = 0x02;
 
 export type ScrcpyServerOptions = {
   deviceSerial: string;
   maxSize?: number;
   maxFps?: number;
+  control?: boolean;
+  audio?: boolean;
+  scid?: number;
   /** Bit rate in bps, or a suffixed string: "8M" = 8_000_000, "4000K" = 4_000_000. */
   videoBitRate?: number | string;
 };
+
+export type ScrcpyServerStats = {
+  packets: number;
+  sessionMeta: number;
+  configs: number;
+  keyframes: number;
+  deviceMessages: number;
+  lastHeader?: string;
+  lastNalType?: number;
+};
+
+type DeviceMessage =
+  | { type: "clipboard"; text: string }
+  | { type: "ack_clipboard"; sequence: string }
+  | { type: "uhid_output"; id: number; data: Buffer };
+
+function toScidHex(scid: number): string {
+  const normalized = (scid & 0x7fffffff) >>> 0;
+  return normalized.toString(16).padStart(8, "0");
+}
+
+function codecIdToText(codecId: number): string {
+  const b = Buffer.allocUnsafe(4);
+  b.writeUInt32BE(codecId, 0);
+  const text = b.toString("ascii").replace(/\0/g, "");
+  return text.length > 0 ? text : `0x${codecId.toString(16).padStart(8, "0")}`;
+}
 
 /** Parse bit-rate values like "8M", "4000K", or plain numbers → bps integer. */
 function parseBitRate(value: number | string | undefined, defaultBps = 4_000_000): number {
@@ -99,7 +110,7 @@ class SocketReader {
       this.pending.length = 0;
     });
     socket.on("close", () => {
-      const err = new Error("Socket closed");
+      const err = new Error("Video socket closed");
       for (const p of this.pending) p.reject(err);
       this.pending.length = 0;
     });
@@ -110,6 +121,11 @@ class SocketReader {
       this.pending.push({ n, resolve, reject });
       this.drain();
     });
+  }
+
+  /** Put bytes back at the front of the internal buffer (for debug peek-and-replay). */
+  prepend(data: Buffer): void {
+    this.buf = Buffer.concat([data, this.buf]);
   }
 
   private drain(): void {
@@ -128,8 +144,10 @@ function tcpConnect(port: number): Promise<net.Socket> {
     s.once("connect", () => {
       // The adb forwarder may accept the TCP connection but immediately close it
       // when the abstract socket on the device side isn't listening yet.
-      // Wait up to 500ms: if the socket receives data or stays open → resolve;
-      // if it closes within that window → reject so the caller can retry.
+      // Wait 200ms: if the socket closes in that window → reject so caller retries;
+      // otherwise the connection is live and we resolve.
+      // Do NOT add a "data" listener here — it would consume bytes from the stream
+      // before SocketReader is attached, causing data loss.
       let settled = false;
       const settle = (fn: () => void) => {
         if (settled) return;
@@ -137,18 +155,15 @@ function tcpConnect(port: number): Promise<net.Socket> {
         clearTimeout(timer);
         s.off("close", onClose);
         s.off("error", onEarlyError);
-        s.off("data", onData);
         fn();
       };
 
-      const timer = setTimeout(() => settle(() => resolve(s)), 500);
+      const timer = setTimeout(() => settle(() => resolve(s)), 200);
       const onClose = () => settle(() => reject(new Error("Socket closed immediately after connect")));
       const onEarlyError = (err: Error) => settle(() => reject(err));
-      const onData = () => settle(() => resolve(s));
 
       s.once("close", onClose);
       s.once("error", onEarlyError);
-      s.once("data", onData);
     });
   });
 }
@@ -174,13 +189,59 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function hasIdrNal(data: Buffer): boolean {
+  return findNalType(data, NAL_IDR) !== undefined;
+}
+
+function findFirstNalType(data: Buffer): number | undefined {
+  return findNalType(data);
+}
+
+function findNalType(data: Buffer, wantedType?: number): number | undefined {
+  for (let i = 0; i <= data.length - 4; i++) {
+    if (data[i] !== 0 || data[i + 1] !== 0) {
+      continue;
+    }
+
+    let headerOff = -1;
+    if (data[i + 2] === 1) {
+      headerOff = i + 3;
+    } else if (data[i + 2] === 0 && data[i + 3] === 1) {
+      headerOff = i + 4;
+    }
+
+    if (headerOff !== -1 && headerOff < data.length) {
+      const nalType = data[headerOff] & 0x1f;
+      if (wantedType === undefined || nalType === wantedType) {
+        return nalType;
+      }
+    }
+  }
+
+  return undefined;
+}
+
 export class ScrcpyServer extends EventEmitter {
+  private scid = DEFAULT_SCID;
   private videoSocket!: net.Socket;
   private videoReader!: SocketReader;
+  private controlSocket?: net.Socket;
+  private controlReader?: SocketReader;
   private shellProcess!: ChildProcess;
   private _running = false;
+  private controlEnabled = false;
+  private audioEnabled = false;
   private deviceSerial = "";
   private shellExitMessage: string | undefined;
+  private latestCodecConfigFrame: Buffer | undefined;
+  private latestKeyFrame: Buffer | undefined;
+  private readonly stats: ScrcpyServerStats = {
+    packets: 0,
+    sessionMeta: 0,
+    configs: 0,
+    keyframes: 0,
+    deviceMessages: 0,
+  };
 
   /** Always 0 — we don't have a single process PID like ScrcpyProcess did. */
   readonly pid = 0;
@@ -189,8 +250,24 @@ export class ScrcpyServer extends EventEmitter {
     return this._running;
   }
 
+  getLatestCodecConfigFrame(): Buffer | undefined {
+    return this.latestCodecConfigFrame;
+  }
+
+  getLatestKeyFrame(): Buffer | undefined {
+    return this.latestKeyFrame;
+  }
+
+  getStats(): ScrcpyServerStats {
+    return { ...this.stats };
+  }
+
   async start(options: ScrcpyServerOptions): Promise<void> {
     this.deviceSerial = options.deviceSerial;
+    this.controlEnabled = options.control ?? false;
+    this.audioEnabled = options.audio ?? false;
+    this.scid = options.scid ?? DEFAULT_SCID;
+    const socketName = this.scid === DEFAULT_SCID ? "scrcpy" : `scrcpy_${toScidHex(this.scid)}`;
 
     // 1. Get bundled jar path
     const localJar = getServerJarPath();
@@ -223,7 +300,7 @@ export class ScrcpyServer extends EventEmitter {
 
     // 4. Set up port forward (remove any stale forward first)
     await adbForwardRemove(options.deviceSerial, FORWARD_PORT);
-    await adbForward(options.deviceSerial, FORWARD_PORT, "scrcpy");
+    await adbForward(options.deviceSerial, FORWARD_PORT, socketName);
 
     // 5. Launch the scrcpy Java server (runs indefinitely — do NOT await)
     this.shellProcess = adbShellSpawn(options.deviceSerial, [
@@ -232,13 +309,18 @@ export class ScrcpyServer extends EventEmitter {
       "/",
       "com.genymobile.scrcpy.Server",
       SERVER_VERSION,
+      ...(this.scid === DEFAULT_SCID ? [] : [`scid=${toScidHex(this.scid)}`]),
       "tunnel_forward=true",
       "video_codec=h264",
       `max_size=${options.maxSize ?? 1080}`,
       `max_fps=${options.maxFps ?? 60}`,
       `video_bit_rate=${parseBitRate(options.videoBitRate)}`,
-      "audio=false",
-      "control=false",
+      `audio=${this.audioEnabled}`,
+      `control=${this.controlEnabled}`,
+      "send_device_meta=true",
+      "send_stream_meta=true",
+      "send_frame_meta=true",
+      "send_dummy_byte=true",
     ]);
 
     this.shellProcess.stdout?.on("data", (chunk: Buffer) => {
@@ -262,36 +344,77 @@ export class ScrcpyServer extends EventEmitter {
     // 6. Connect and complete handshake (with retry while server boots)
     // Give the JVM a moment to start before the first connection attempt.
     await sleep(800);
-    await this.connectAndHandshake();
+    await this.connectAndHandshake(socketName);
 
     this._running = true;
 
     // 7. Start streaming packets in the background
     void this.streamPackets();
+    if (this.controlEnabled) {
+      void this.readDeviceMessages();
+    }
   }
 
-  private async connectAndHandshake(): Promise<void> {
+  private async connectAndHandshake(socketName: string): Promise<void> {
     // Video socket — retry until server is ready.
     // tcpConnect resolves only when the connection stays open (not immediately closed).
     this.videoSocket = await tcpConnectWithRetry(FORWARD_PORT);
     this.videoReader = new SocketReader(this.videoSocket);
 
     // 1. Discard the 1-byte dummy (0x00) sent by the server (sendDummyByte=true default).
-    //    With control=false the server only accepts this one socket and immediately
-    //    proceeds to sendDeviceMeta — no second accept() needed.
     await this.readOrThrowShellError(1);
 
     // 2. Read 64-byte device name (null-padded UTF-8)
     const deviceNameBuf = await this.readOrThrowShellError(64);
     const deviceName = deviceNameBuf.toString("utf8").replace(/\0/g, "");
 
-    // 3. Read 4-byte codec_id (e.g. 0x68323634 = "h264"), sent as sendStreamMeta header
-    const codecBuf = await this.readOrThrowShellError(4);
-    const codecId = codecBuf.toString("ascii").replace(/\0/g, "");
+    // 3. Read video codec id (4 bytes only — v4.0 Streamer.writeVideoHeader).
+    const codecIdBuf = await this.readOrThrowShellError(4);
+    const videoCodecId = codecIdBuf.readUInt32BE(0);
+
+    // 4. Read session header (12 bytes): flags + width + height.
+    //    For video, the first 12-byte header after codec_id is always a session packet.
+    const sessionHeader = await this.readOrThrowShellError(12);
+    const sessionFlags = sessionHeader.readUInt32BE(0);
+    const videoWidth = sessionHeader.readUInt32BE(4);
+    const videoHeight = sessionHeader.readUInt32BE(8);
+    const isSession = (sessionFlags & 0x80000000) !== 0;
+    if (!isSession) {
+      throw new Error(`[ScrcpyServer] Expected session header but got flags=0x${sessionFlags.toString(16)}`);
+    }
+
+    if (videoCodecId === 0x00000000) {
+      throw new Error("[ScrcpyServer] Device disabled the video stream (codec_id=0)");
+    }
+    if (videoCodecId === 0x00000001) {
+      throw new Error("[ScrcpyServer] Device reported video codec configuration error (codec_id=1)");
+    }
 
     console.log(
-      `[ScrcpyServer] Connected — device: "${deviceName}", codec: "${codecId}"`,
+      `[ScrcpyServer] Connected (${socketName}) — device: "${deviceName}", video codec: "${codecIdToText(
+        videoCodecId,
+      )}" ${videoWidth}x${videoHeight}`,
     );
+
+    if (this.audioEnabled) {
+      const audioSocket = await tcpConnectWithRetry(FORWARD_PORT);
+      const audioReader = new SocketReader(audioSocket);
+      const audioCodecMeta = await audioReader.read(4);
+      const audioCodecId = audioCodecMeta.readUInt32BE(0);
+      if (audioCodecId === 0x00000000) {
+        console.warn("[ScrcpyServer] Device disabled audio stream (codec_id=0)");
+      } else if (audioCodecId === 0x00000001) {
+        console.warn("[ScrcpyServer] Device reported audio codec configuration error (codec_id=1)");
+      } else {
+        console.log(`[ScrcpyServer] Audio codec: "${codecIdToText(audioCodecId)}"`);
+      }
+      audioSocket.destroy();
+    }
+
+    if (this.controlEnabled) {
+      this.controlSocket = await tcpConnectWithRetry(FORWARD_PORT);
+      this.controlReader = new SocketReader(this.controlSocket);
+    }
   }
 
   /**
@@ -311,55 +434,165 @@ export class ScrcpyServer extends EventEmitter {
   }
 
   private async streamPackets(): Promise<void> {
+    let streamOffset = 0;
+    let pktNum = 0;
     try {
       while (this._running) {
-        // Read high 4 bytes to determine packet type.
-        const hiWord = (await this.videoReader.read(4)).readUInt32BE(0);
+        const headerOffset = streamOffset;
+        const header = await this.videoReader.read(12);
+        streamOffset += 12;
+        pktNum++;
 
-        if (hiWord === PKT_FLAG_SESSION_HI) {
-          // Session/resize meta: [hi:4B already read][width:4B][height:4B] — 12B total, no data
-          const rest = await this.videoReader.read(8);
-          const w = rest.readUInt32BE(0);
-          const h = rest.readUInt32BE(4);
-          console.log(`[ScrcpyServer] Resolution: ${w}×${h}`);
+        const firstByte = header[0];
+        const isSession = (firstByte & 0x80) !== 0;
+
+        // Session packet: 4-byte flags + 4-byte width + 4-byte height (no payload).
+        if (isSession) {
+          const flags = header.readUInt32BE(0);
+          const width = header.readUInt32BE(4);
+          const height = header.readUInt32BE(8);
+          this.stats.sessionMeta += 1;
+          this.stats.lastHeader = `session ${width}x${height}`;
+          console.log(`[ScrcpyServer] [DBG] pkt#${pktNum}: SESSION ${width}×${height} (flags=0x${flags.toString(16)}) → skip`);
           continue;
         }
 
-        // Regular data packet: read remaining 4B of pts + 4B size
-        const loAndSize = await this.videoReader.read(8);
-        const ptsAndFlags =
-          (BigInt(hiWord) << 32n) | BigInt(loAndSize.readUInt32BE(0));
-        const size = loAndSize.readUInt32BE(4);
-        const data = await this.videoReader.read(size);
-
+        // Media packet: 8-byte pts_flags + 4-byte size, then payload.
+        const ptsAndFlags = header.readBigUInt64BE(0);
+        const size = header.readUInt32BE(8);
         const isConfig = (ptsAndFlags & PKT_FLAG_CONFIG) !== 0n;
-        const pts = isConfig
-          ? WS_CODEC_CONFIG_PTS
-          : ptsAndFlags & ~(PKT_FLAG_CONFIG | PKT_FLAG_KEY_FRAME);
+        const isKey = (ptsAndFlags & PKT_FLAG_KEY_FRAME) !== 0n;
 
-        // Build WS frame: [type: 0x01][PTS: 8B][data]
+        console.log(
+          `[ScrcpyServer] [DBG] pkt#${pktNum} @offset=${headerOffset}: ` +
+          `hdr=${header.toString("hex")} pts=0x${ptsAndFlags.toString(16)} ` +
+          `size=${size} CONFIG=${isConfig} KEY=${isKey}`,
+        );
+
+        if (size > 16 * 1024 * 1024) {
+          console.error(
+            `[ScrcpyServer] [DBG] INVALID SIZE at offset=${headerOffset}: size=${size} (0x${size.toString(16)}), ` +
+            `hdr bytes: ${header.toString("hex")}`,
+          );
+          throw new Error(`[ScrcpyServer] Invalid video packet size ${size}`);
+        }
+
+        const data = size > 0 ? await this.videoReader.read(size) : Buffer.alloc(0);
+        streamOffset += size;
+        const firstBytes = data.subarray(0, Math.min(24, data.length)).toString("hex");
+        console.log(
+          `[ScrcpyServer] [DBG] pkt#${pktNum}: data read OK, ${size} bytes, first24=${firstBytes}, ` +
+          `nextOffset=${streamOffset}`,
+        );
+
+        const isKeyFrame = isKey || hasIdrNal(data);
+
+        this.stats.packets += 1;
+        this.stats.lastHeader = `pts=0x${ptsAndFlags.toString(16)} size=${size}`;
+        this.stats.lastNalType = findFirstNalType(data);
+
+        // Build WS frame: [type: 0x01][pts_flags: 8B][data]
         const frame = Buffer.allocUnsafe(1 + 8 + data.length);
-        frame[0] = 0x01;
-        frame.writeBigUInt64BE(pts, 1);
+        frame[0] = VIDEO_MSG_TYPE;
+        frame.writeBigUInt64BE(ptsAndFlags, 1);
         data.copy(frame, 9);
+
+        if (isConfig) {
+          this.stats.configs += 1;
+          this.latestCodecConfigFrame = frame;
+          console.log(`[ScrcpyServer] [DBG] pkt#${pktNum}: CONFIG stored (total configs=${this.stats.configs})`);
+        } else if (isKeyFrame) {
+          this.stats.keyframes += 1;
+          this.latestKeyFrame = frame;
+          console.log(`[ScrcpyServer] [DBG] pkt#${pktNum}: KEYFRAME stored (total keyframes=${this.stats.keyframes})`);
+        } else {
+          console.log(`[ScrcpyServer] [DBG] pkt#${pktNum}: delta frame`);
+        }
 
         this.emit("data", frame);
       }
-    } catch {
+    } catch (err) {
       if (this._running) {
         this._running = false;
+        const error =
+          err instanceof Error
+            ? new Error(`[ScrcpyServer] Stream failed after ${this.stats.packets} packet(s): ${err.message}`)
+            : new Error(`[ScrcpyServer] Stream failed after ${this.stats.packets} packet(s): ${String(err)}`);
+        this.emit("error", error);
         this.emit("exit", 1, null);
       }
     }
   }
 
-  /** @deprecated Control socket is not used in control=false mode. */
-  sendControl(_data: Buffer | Uint8Array): void {}
+  private async readDeviceMessages(): Promise<void> {
+    if (!this.controlReader) {
+      return;
+    }
+
+    try {
+      while (this._running && this.controlReader) {
+        const msg = await this.readOneDeviceMessage(this.controlReader);
+        this.stats.deviceMessages += 1;
+        this.emit("device-message", msg);
+      }
+    } catch (err) {
+      if (!this._running) {
+        return;
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      this.emit("log", `[ScrcpyServer] Control reader stopped: ${message}`);
+    }
+  }
+
+  private async readOneDeviceMessage(reader: SocketReader): Promise<DeviceMessage> {
+    const type = (await reader.read(1)).readUInt8(0);
+
+    if (type === DEVICE_MSG_TYPE_CLIPBOARD) {
+      const len = (await reader.read(4)).readUInt32BE(0);
+      const textBuf = len > 0 ? await reader.read(len) : Buffer.alloc(0);
+      return {
+        type: "clipboard",
+        text: textBuf.toString("utf8"),
+      };
+    }
+
+    if (type === DEVICE_MSG_TYPE_ACK_CLIPBOARD) {
+      const sequence = (await reader.read(8)).readBigUInt64BE(0);
+      return {
+        type: "ack_clipboard",
+        sequence: sequence.toString(),
+      };
+    }
+
+    if (type === DEVICE_MSG_TYPE_UHID_OUTPUT) {
+      const header = await reader.read(4);
+      const id = header.readUInt16BE(0);
+      const size = header.readUInt16BE(2);
+      const data = size > 0 ? await reader.read(size) : Buffer.alloc(0);
+      return {
+        type: "uhid_output",
+        id,
+        data,
+      };
+    }
+
+    throw new Error(`Unknown device message type: ${type}`);
+  }
+
+  sendControl(data: Buffer | Uint8Array): void {
+    if (!this.controlEnabled || !this.controlSocket || this.controlSocket.destroyed) {
+      return;
+    }
+
+    const payload = Buffer.isBuffer(data) ? data : Buffer.from(data);
+    this.controlSocket.write(payload);
+  }
 
   stop(): void {
     if (!this._running) return;
     this._running = false;
     this.videoSocket?.destroy();
+    this.controlSocket?.destroy();
     this.shellProcess?.kill("SIGTERM");
     adbForwardRemove(this.deviceSerial, FORWARD_PORT).catch(() => {});
     this.emit("exit", 0, null);

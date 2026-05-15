@@ -1,6 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { ScrcpyH264Decoder } from "./codec/h264.js";
+import { ScrcpyH264Decoder, type DecoderStats } from "./codec/h264.js";
 
 type HealthResponse = {
   ok: boolean;
@@ -25,6 +25,15 @@ type ScrcpySession = {
   pid: number;
   status: "running" | "stopped" | "error";
   createdAt: number;
+  error?: string;
+  stats?: {
+    packets: number;
+    sessionMeta: number;
+    configs: number;
+    keyframes: number;
+    lastHeader?: string;
+    lastNalType?: number;
+  };
 };
 
 type AppData = {
@@ -38,6 +47,16 @@ type AppData = {
 function VideoCanvas({ sessionId }: { sessionId: string }) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const [streamError, setStreamError] = React.useState<string | null>(null);
+  const [stats, setStats] = React.useState<DecoderStats>({
+    packets: 0,
+    invalidType: 0,
+    ignoredNonVideo: 0,
+    configs: 0,
+    frames: 0,
+    keyframes: 0,
+    decoded: 0,
+    waitingForKeyframe: true,
+  });
 
   React.useEffect(() => {
     const canvas = canvasRef.current;
@@ -64,17 +83,31 @@ function VideoCanvas({ sessionId }: { sessionId: string }) {
         frame.close();
       },
       (err) => setStreamError(err.message),
+      setStats,
     );
 
     const wsProto = location.protocol === "https:" ? "wss:" : "ws:";
     const ws = new WebSocket(`${wsProto}//${location.host}/ws/stream/${sessionId}`);
     ws.binaryType = "arraybuffer";
+    console.log("[WS Client] Connecting to", ws.url);
 
-    ws.onmessage = (e: MessageEvent<ArrayBuffer>) => {
-      decoder.push(new Uint8Array(e.data));
+    ws.onopen = () => console.log("[WS Client] Connected");
+    ws.onmessage = (e: MessageEvent<ArrayBuffer | string>) => {
+      console.log(`[WS Client] onmessage: type=${typeof e.data}, isArrayBuffer=${e.data instanceof ArrayBuffer}`);
+      if (typeof e.data === "string") {
+        console.log(`[WS Client] Got text: ${e.data}`);
+        return;
+      }
+      console.log(`[WS Client] byteLength=${e.data.byteLength}`);
+      const arr = new Uint8Array(e.data);
+      console.log(`[WS Client] first bytes: ${arr.slice(0,12).map(b=>b.toString(16).padStart(2,'0')).join(' ')}`);
+      decoder.push(e.data);
     };
 
-    ws.onerror = () => setStreamError("WebSocket connection error");
+    ws.onerror = () => {
+      console.log("[WS Client] Error");
+      setStreamError("WebSocket connection error");
+    };
 
     ws.onclose = (e) => {
       if (e.code !== 1000 && e.code !== 1005) {
@@ -99,6 +132,18 @@ function VideoCanvas({ sessionId }: { sessionId: string }) {
         ref={canvasRef}
         style={{ width: "100%", maxWidth: 640, display: "block", background: "#000" }}
       />
+      <p style={{ color: "#475569", fontSize: "0.8rem", margin: "4px 0" }}>
+        packets {stats.packets} · config {stats.configs} · frames {stats.frames} · keyframes{" "}
+        {stats.keyframes} · decoded {stats.decoded} · waiting keyframe{" "}
+        {stats.waitingForKeyframe ? "yes" : "no"}
+        {stats.codec ? ` · ${stats.codec}` : ""}
+      </p>
+      <p style={{ color: "#64748b", fontSize: "0.75rem", margin: "4px 0" }}>
+        invalid type {stats.invalidType} · last type{" "}
+        {stats.lastType === undefined ? "-" : `0x${stats.lastType.toString(16).padStart(2, "0")}`} ·{" "}
+        ignored non-video {stats.ignoredNonVideo} ·{" "}
+        {stats.lastHeader ?? "-"}
+      </p>
     </div>
   );
 }
@@ -202,6 +247,10 @@ function App() {
     );
   }
 
+  function latestSessionForDevice(serial: string): ScrcpySession | undefined {
+    return scrcpySessions.find((s) => s.deviceSerial === serial);
+  }
+
   return (
     <main style={{ fontFamily: "ui-sans-serif, system-ui", padding: 24 }}>
       <h1>scrcpy-web</h1>
@@ -227,6 +276,7 @@ function App() {
           <ul style={{ listStyle: "none", padding: 0 }}>
             {devices.map((device) => {
               const runningSession = runningSessionForDevice(device.id);
+              const latestSession = latestSessionForDevice(device.id);
               return (
                 <li key={device.id} style={{ marginBottom: 16 }}>
                   <div>
@@ -252,6 +302,27 @@ function App() {
                   {runningSession && (
                     <VideoCanvas sessionId={runningSession.id} />
                   )}
+                  {latestSession && (
+                    <p style={{ color: "#64748b", fontSize: "0.75rem", margin: "4px 0" }}>
+                      session {latestSession.status} · server packets{" "}
+                      {latestSession.stats?.packets ?? 0} · meta{" "}
+                      {latestSession.stats?.sessionMeta ?? 0} · config{" "}
+                      {latestSession.stats?.configs ?? 0} · keyframes{" "}
+                      {latestSession.stats?.keyframes ?? 0} · nal{" "}
+                      {latestSession.stats?.lastNalType ?? "-"} ·{" "}
+                      {latestSession.stats?.lastHeader ?? "-"}
+                    </p>
+                  )}
+                  {scrcpySessions
+                    .filter((s) => s.deviceSerial === device.id && s.status === "error")
+                    .map((s) => (
+                      <p
+                        key={s.id}
+                        style={{ color: "#b91c1c", fontSize: "0.85rem", margin: "4px 0" }}
+                      >
+                        scrcpy error: {s.error ?? "unknown error"}
+                      </p>
+                    ))}
                 </li>
               );
             })}
@@ -309,4 +380,3 @@ if (!container) {
 }
 
 createRoot(container).render(<App />);
-

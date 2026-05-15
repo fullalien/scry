@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { ScrcpyServer, type ScrcpyServerOptions } from "./ScrcpyServer.js";
+import { ScrcpyServer, type ScrcpyServerOptions, type ScrcpyServerStats } from "./ScrcpyServer.js";
 
 export type ScrcpySessionStatus = "running" | "stopped" | "error";
 
@@ -10,6 +10,8 @@ export type ScrcpySession = {
   status: ScrcpySessionStatus;
   createdAt: number;
   updatedAt: number;
+  error?: string;
+  stats?: ScrcpyServerStats;
 };
 
 export type StartScrcpyOptions = Partial<
@@ -77,6 +79,9 @@ export class ScrcpyManager {
     server.on("exit", () => {
       const entry = this.entries.get(id);
       if (entry) {
+        if (entry.session.status === "error") {
+          return;
+        }
         this.entries.set(id, {
           ...entry,
           session: { ...entry.session, status: "stopped", updatedAt: Date.now() },
@@ -84,12 +89,17 @@ export class ScrcpyManager {
       }
     });
 
-    server.on("error", () => {
+    server.on("error", (err) => {
       const entry = this.entries.get(id);
       if (entry) {
         this.entries.set(id, {
           ...entry,
-          session: { ...entry.session, status: "error", updatedAt: Date.now() },
+          session: {
+            ...entry.session,
+            status: "error",
+            updatedAt: Date.now(),
+            error: err instanceof Error ? err.message : String(err),
+          },
         });
       }
     });
@@ -130,7 +140,10 @@ export class ScrcpyManager {
 
   list(): ScrcpySession[] {
     return [...this.entries.values()]
-      .map((e) => e.session)
+      .map((e) => ({
+        ...e.session,
+        stats: e.process.getStats(),
+      }))
       .sort((a, b) => b.createdAt - a.createdAt);
   }
 

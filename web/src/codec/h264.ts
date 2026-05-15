@@ -22,7 +22,10 @@
  */
 
 export const VIDEO_MSG_TYPE = 0x01;
-export const CODEC_CONFIG_PTS = 0x8000000000000000n;
+const PACKET_FLAG_SESSION = 0x8000000000000000n;   // bit 63
+const PACKET_FLAG_CONFIG = 0x4000000000000000n;     // bit 62
+const PACKET_FLAG_KEY_FRAME = 0x2000000000000000n;  // bit 61
+const PTS_MASK = 0x1fffffffffffffffn;                // lower 61 bits
 
 // ---------------------------------------------------------------------------
 // NAL utilities
@@ -33,7 +36,7 @@ const NAL_SPS = 7;
 
 /** Scan Annex-B data for a NAL unit of a given type; return its offset or -1. */
 function findNalOffset(data: Uint8Array, nalType: number): number {
-  for (let i = 0; i < data.length - 4; i++) {
+  for (let i = 0; i <= data.length - 4; i++) {
     if (data[i] === 0 && data[i + 1] === 0) {
       let headerOff = -1;
       if (data[i + 2] === 1) {
@@ -41,7 +44,7 @@ function findNalOffset(data: Uint8Array, nalType: number): number {
       } else if (data[i + 2] === 0 && i + 3 < data.length && data[i + 3] === 1) {
         headerOff = i + 4;
       }
-      if (headerOff !== -1 && (data[headerOff] & 0x1f) === nalType) {
+      if (headerOff !== -1 && headerOff < data.length && (data[headerOff] & 0x1f) === nalType) {
         return headerOff;
       }
     }
@@ -73,6 +76,20 @@ export function extractCodecString(data: Uint8Array): string {
 // ---------------------------------------------------------------------------
 
 export type DecoderErrorHandler = (err: Error) => void;
+export type DecoderStats = {
+  packets: number;
+  invalidType: number;
+  ignoredNonVideo: number;
+  configs: number;
+  frames: number;
+  keyframes: number;
+  decoded: number;
+  waitingForKeyframe: boolean;
+  lastType?: number;
+  lastHeader?: string;
+  codec?: string;
+};
+export type DecoderStatsHandler = (stats: DecoderStats) => void;
 
 /**
  * Decodes the scrcpy-server framed binary stream using the WebCodecs API.
@@ -90,65 +107,118 @@ export class ScrcpyH264Decoder {
   private decoder: VideoDecoder | null = null;
   private configured = false;
   private codecConfig: Uint8Array | null = null;
+  private waitingForKeyframe = true;
+  private stats: DecoderStats = {
+    packets: 0,
+    invalidType: 0,
+    ignoredNonVideo: 0,
+    configs: 0,
+    frames: 0,
+    keyframes: 0,
+    decoded: 0,
+    waitingForKeyframe: true,
+  };
 
   constructor(
     private readonly onFrame: (frame: VideoFrame) => void,
     private readonly onError: DecoderErrorHandler = (e) =>
-      console.error("[H264Decoder]", e),
-  ) {}
+      console.error("[H264] Decoder error:", e),
+    private readonly onStats: DecoderStatsHandler = () => {},
+  ) {
+    console.log("[H264] ScrcpyH264Decoder created, VideoDecoder supported:", "VideoDecoder" in window);
+  }
 
   /** Feed one raw WebSocket binary message. */
   push(buffer: ArrayBuffer): void {
+    const size = buffer.byteLength;
+    const type = new Uint8Array(buffer, 0, 1)[0];
+
+    if (type !== VIDEO_MSG_TYPE) {
+      this.stats.ignoredNonVideo += 1;
+      this.emitStats();
+      return;
+    }
+
     const view = new DataView(buffer);
-    if (view.getUint8(0) !== VIDEO_MSG_TYPE) return;
+    const ptsHi = view.getUint32(1);
+    const ptsLo = view.getUint32(5);
+    const ptsAndFlags = (BigInt(ptsHi) << 32n) | BigInt(ptsLo);
+    const isConfig = (ptsAndFlags & PACKET_FLAG_CONFIG) !== 0n;
+    const pts = ptsAndFlags & PTS_MASK;
+    const dataOff = 9;
+    const dataLen = buffer.byteLength - dataOff;
 
-    // Read PTS as two 32-bit halves to avoid BigInt parsing issues in older runtimes
-    const ptsHi = BigInt(view.getUint32(1));
-    const ptsLo = BigInt(view.getUint32(5));
-    const pts = (ptsHi << 32n) | ptsLo;
+    this.stats.packets += 1;
 
-    const data = new Uint8Array(buffer, 9);
-
-    if (pts === CODEC_CONFIG_PTS) {
-      this.handleCodecConfig(data);
+    if (isConfig) {
+      const first20 = Array.from(new Uint8Array(buffer, 9, Math.min(20, dataLen))).map(n => n.toString(16).padStart(2, '0')).join(' ');
+      console.log(`[H264] CONFIG packet, dataLen=${dataLen}, first bytes: ${first20}`);
+      this.handleCodecConfig(new Uint8Array(buffer, dataOff));
     } else {
-      this.handleFrame(pts, data);
+      console.log(`[H264] FRAME: size=${size}, pts=${pts}, isKey=${(ptsAndFlags & PACKET_FLAG_KEY_FRAME) !== 0n}, dataLen=${dataLen}`);
+      this.handleFrame(pts, ptsAndFlags, new Uint8Array(buffer, dataOff));
     }
   }
 
   private handleCodecConfig(data: Uint8Array): void {
+    console.log(`[H264] handleCodecConfig: data length=${data.length}`);
     const codec = extractCodecString(data);
+    console.log(`[H264] Extracted codec: ${codec}`);
+    this.stats.configs += 1;
+    this.stats.codec = codec;
 
-    // Save a copy of SPS+PPS to prepend to subsequent keyframes
     this.codecConfig = data.slice();
+    this.waitingForKeyframe = true;
 
     this.decoder?.close();
     this.decoder = new VideoDecoder({
       output: (frame) => {
+        console.log(`[H264] Output: ${frame.displayWidth}x${frame.displayHeight}, timestamp=${frame.timestamp}`);
+        this.stats.decoded += 1;
         this.onFrame(frame);
-        frame.close();
       },
-      error: (e) => this.onError(new Error(String(e))),
+      error: (e) => {
+        console.log(`[H264] Decoder error:`, e);
+        this.onError(new Error(String(e)));
+      },
     });
 
-    this.decoder.configure({
-      codec,
-      optimizeForLatency: true,
-    });
+    console.log(`[H264] configure: codec=${codec}`);
+    try {
+      this.decoder.configure({
+        codec,
+        optimizeForLatency: true,
+      });
+      console.log(`[H264] configure success, state=${this.decoder.state}`);
+      this.emitStats();
+    } catch (e) {
+      console.log(`[H264] configure failed:`, e);
+      return;
+    }
 
     this.configured = true;
   }
 
-  private handleFrame(pts: bigint, data: Uint8Array): void {
-    if (!this.configured || !this.decoder) return;
+  private handleFrame(pts: bigint, ptsAndFlags: bigint, data: Uint8Array): void {
+    if (!this.configured || !this.decoder) {
+      console.log(`[H264] handleFrame: not configured yet, dropping`);
+      return;
+    }
+    this.stats.frames += 1;
 
-    // Drop frames when the decoder is backlogged to avoid unbounded latency
-    if (this.decoder.decodeQueueSize > 2) return;
+    const isKey = (ptsAndFlags & PACKET_FLAG_KEY_FRAME) !== 0n || hasIdrNal(data);
+    if (isKey) {
+      this.stats.keyframes += 1;
+    }
+    this.stats.waitingForKeyframe = this.waitingForKeyframe;
 
-    const isKey = hasIdrNal(data);
+    if (!isKey && this.waitingForKeyframe) {
+      console.log(`[H264] handleFrame: waiting for keyframe, dropping`);
+      return;
+    }
+    this.waitingForKeyframe = false;
+    this.stats.waitingForKeyframe = false;
 
-    // For keyframes, prepend the saved SPS+PPS so the decoder always gets
-    // parameter sets even after a seek or restart.
     let frameData: Uint8Array;
     if (isKey && this.codecConfig) {
       frameData = new Uint8Array(this.codecConfig.length + data.length);
@@ -162,11 +232,13 @@ export class ScrcpyH264Decoder {
       this.decoder.decode(
         new EncodedVideoChunk({
           type: isKey ? "key" : "delta",
-          timestamp: Number(pts), // PTS is already in microseconds
+          timestamp: Number(pts),
           data: frameData,
         }),
       );
+      this.emitStats();
     } catch (e) {
+      console.log(`[H264] decode error:`, e);
       this.onError(e instanceof Error ? e : new Error(String(e)));
     }
   }
@@ -179,5 +251,11 @@ export class ScrcpyH264Decoder {
     this.decoder = null;
     this.configured = false;
     this.codecConfig = null;
+    this.waitingForKeyframe = true;
+    this.stats.waitingForKeyframe = true;
+  }
+
+  private emitStats(): void {
+    this.onStats({ ...this.stats });
   }
 }
