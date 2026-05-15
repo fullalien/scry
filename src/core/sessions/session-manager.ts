@@ -4,11 +4,11 @@ import {
   mkdirSync,
   readFileSync,
   writeFileSync,
-} from "node:fs";
-import { homedir } from "node:os";
-import path from "node:path";
+} from 'node:fs';
+import { homedir } from 'node:os';
+import path from 'node:path';
 
-export type SessionStatus = "running" | "stopped";
+export type SessionStatus = 'running' | 'stopped';
 
 export type Session = {
   id: string;
@@ -22,7 +22,11 @@ export type Session = {
   updatedAt: number;
 };
 
-export type StopSessionResult = "stopped" | "not-found" | "already-stopped" | "failed";
+export type StopSessionResult =
+  | 'stopped'
+  | 'not-found'
+  | 'already-stopped'
+  | 'failed';
 export type StopAllSessionsResult = {
   stopped: string[];
   failed: string[];
@@ -34,10 +38,17 @@ export type ListSessionsOptions = {
 
 const STATE_DIR = process.env.SCRCPY_WEB_STATE_DIR
   ? path.resolve(process.env.SCRCPY_WEB_STATE_DIR)
-  : path.join(homedir(), ".scrcpy-web");
-const STATE_FILE = path.join(STATE_DIR, "sessions.json");
-const LEGACY_STATE_FILE = path.resolve(process.cwd(), ".scrcpy-web", "sessions.json");
-const STOPPED_SESSION_TTL_MS = parseInt(process.env.STOPPED_SESSION_TTL_MS ?? "3600000", 10); // Default: 1 hour
+  : path.join(homedir(), '.scrcpy-web');
+const STATE_FILE = path.join(STATE_DIR, 'sessions.json');
+const LEGACY_STATE_FILE = path.resolve(
+  process.cwd(),
+  '.scrcpy-web',
+  'sessions.json'
+);
+const STOPPED_SESSION_TTL_MS = parseInt(
+  process.env.STOPPED_SESSION_TTL_MS ?? '3600000',
+  10
+); // Default: 1 hour
 
 let cleanupIntervalId: NodeJS.Timeout | null = null;
 
@@ -54,10 +65,10 @@ function readSessionsMap(): Map<string, Session> {
   migrateLegacyStateFileIfNeeded();
 
   try {
-    const raw = readFileSync(STATE_FILE, "utf8");
+    const raw = readFileSync(STATE_FILE, 'utf8');
     const parsed = JSON.parse(raw) as { sessions?: Session[] };
     const sessions = parsed.sessions ?? [];
-    return new Map(sessions.map((session) => [session.id, session]));
+    return new Map(sessions.map(session => [session.id, session]));
   } catch {
     return new Map();
   }
@@ -69,7 +80,7 @@ function writeSessionsMap(sessions: Map<string, Session>): void {
   const payload = {
     sessions: [...sessions.values()],
   };
-  writeFileSync(STATE_FILE, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  writeFileSync(STATE_FILE, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
 }
 
 function isProcessAlive(pid: number): boolean {
@@ -84,10 +95,10 @@ function isProcessAlive(pid: number): boolean {
 function refreshSessionStates(sessions: Map<string, Session>): void {
   const now = Date.now();
   for (const [id, session] of sessions.entries()) {
-    if (session.status === "running" && !isProcessAlive(session.pid)) {
+    if (session.status === 'running' && !isProcessAlive(session.pid)) {
       sessions.set(id, {
         ...session,
-        status: "stopped",
+        status: 'stopped',
         updatedAt: now,
       });
     }
@@ -97,13 +108,17 @@ function refreshSessionStates(sessions: Map<string, Session>): void {
 function cleanupStoppedSessions(sessions: Map<string, Session>): void {
   const now = Date.now();
   for (const [id, session] of sessions.entries()) {
-    if (session.status === "stopped" && (now - session.updatedAt) > STOPPED_SESSION_TTL_MS) {
+    if (
+      session.status === 'stopped' &&
+      now - session.updatedAt > STOPPED_SESSION_TTL_MS
+    ) {
       sessions.delete(id);
     }
   }
 }
 
-export function startAutoCleanup(intervalMs = 300000): void { // Default: 5 minutes
+export function startAutoCleanup(intervalMs = 300000): void {
+  // Default: 5 minutes
   if (cleanupIntervalId) return;
   cleanupStoppedSessions(readSessionsMap());
   cleanupIntervalId = setInterval(() => {
@@ -125,12 +140,14 @@ export function listSessions(options?: ListSessionsOptions): Session[] {
   refreshSessionStates(sessions);
   cleanupStoppedSessions(sessions);
   writeSessionsMap(sessions);
-  const values = [...sessions.values()].sort((a, b) => b.createdAt - a.createdAt);
+  const values = [...sessions.values()].sort(
+    (a, b) => b.createdAt - a.createdAt
+  );
   if (!options?.status) {
     return values;
   }
 
-  return values.filter((session) => session.status === options.status);
+  return values.filter(session => session.status === options.status);
 }
 
 export function registerSession(session: Session): void {
@@ -151,7 +168,7 @@ export function markSessionStopped(id: string): boolean {
 
   sessions.set(id, {
     ...session,
-    status: "stopped",
+    status: 'stopped',
     updatedAt: Date.now(),
   });
   writeSessionsMap(sessions);
@@ -164,26 +181,26 @@ export function stopSession(id: string): StopSessionResult {
   const session = sessions.get(id);
 
   if (!session) {
-    return "not-found";
+    return 'not-found';
   }
 
-  if (session.status !== "running") {
-    return "already-stopped";
+  if (session.status !== 'running') {
+    return 'already-stopped';
   }
 
   try {
-    process.kill(session.pid, "SIGTERM");
+    process.kill(session.pid, 'SIGTERM');
   } catch {
-    return "failed";
+    return 'failed';
   }
 
   sessions.set(id, {
     ...session,
-    status: "stopped",
+    status: 'stopped',
     updatedAt: Date.now(),
   });
   writeSessionsMap(sessions);
-  return "stopped";
+  return 'stopped';
 }
 
 export function stopAllSessions(): StopAllSessionsResult {
@@ -197,16 +214,16 @@ export function stopAllSessions(): StopAllSessionsResult {
   };
 
   for (const [id, session] of sessions.entries()) {
-    if (session.status !== "running") {
+    if (session.status !== 'running') {
       result.alreadyStopped.push(id);
       continue;
     }
 
     try {
-      process.kill(session.pid, "SIGTERM");
+      process.kill(session.pid, 'SIGTERM');
       sessions.set(id, {
         ...session,
-        status: "stopped",
+        status: 'stopped',
         updatedAt: Date.now(),
       });
       result.stopped.push(id);
@@ -219,8 +236,13 @@ export function stopAllSessions(): StopAllSessionsResult {
   return result;
 }
 
-export function findRunningSessionByAddress(host: string, port: number): Session | null {
-  const running = listSessions({ status: "running" });
-  const found = running.find((session) => session.host === host && session.port === port);
+export function findRunningSessionByAddress(
+  host: string,
+  port: number
+): Session | null {
+  const running = listSessions({ status: 'running' });
+  const found = running.find(
+    session => session.host === host && session.port === port
+  );
   return found ?? null;
 }

@@ -22,10 +22,10 @@
  */
 
 export const VIDEO_MSG_TYPE = 0x01;
-const PACKET_FLAG_SESSION = 0x8000000000000000n;   // bit 63
-const PACKET_FLAG_CONFIG = 0x4000000000000000n;     // bit 62
-const PACKET_FLAG_KEY_FRAME = 0x2000000000000000n;  // bit 61
-const PTS_MASK = 0x1fffffffffffffffn;                // lower 61 bits
+const PACKET_FLAG_SESSION = 0x8000000000000000n; // bit 63
+const PACKET_FLAG_CONFIG = 0x4000000000000000n; // bit 62
+const PACKET_FLAG_KEY_FRAME = 0x2000000000000000n; // bit 61
+const PTS_MASK = 0x1fffffffffffffffn; // lower 61 bits
 
 // ---------------------------------------------------------------------------
 // NAL utilities
@@ -41,10 +41,18 @@ function findNalOffset(data: Uint8Array, nalType: number): number {
       let headerOff = -1;
       if (data[i + 2] === 1) {
         headerOff = i + 3;
-      } else if (data[i + 2] === 0 && i + 3 < data.length && data[i + 3] === 1) {
+      } else if (
+        data[i + 2] === 0 &&
+        i + 3 < data.length &&
+        data[i + 3] === 1
+      ) {
         headerOff = i + 4;
       }
-      if (headerOff !== -1 && headerOff < data.length && (data[headerOff] & 0x1f) === nalType) {
+      if (
+        headerOff !== -1 &&
+        headerOff < data.length &&
+        (data[headerOff] & 0x1f) === nalType
+      ) {
         return headerOff;
       }
     }
@@ -63,12 +71,12 @@ function hasIdrNal(data: Uint8Array): boolean {
 export function extractCodecString(data: Uint8Array): string {
   const off = findNalOffset(data, NAL_SPS);
   if (off !== -1 && off + 3 < data.length) {
-    const p = data[off + 1].toString(16).padStart(2, "0");
-    const c = data[off + 2].toString(16).padStart(2, "0");
-    const l = data[off + 3].toString(16).padStart(2, "0");
+    const p = data[off + 1].toString(16).padStart(2, '0');
+    const c = data[off + 2].toString(16).padStart(2, '0');
+    const l = data[off + 3].toString(16).padStart(2, '0');
     return `avc1.${p}${c}${l}`;
   }
-  return "avc1.42E01E";
+  return 'avc1.42E01E';
 }
 
 // ---------------------------------------------------------------------------
@@ -121,11 +129,10 @@ export class ScrcpyH264Decoder {
 
   constructor(
     private readonly onFrame: (frame: VideoFrame) => void,
-    private readonly onError: DecoderErrorHandler = (e) =>
-      console.error("[H264] Decoder error:", e),
-    private readonly onStats: DecoderStatsHandler = () => {},
-  ) {
-  }
+    private readonly onError: DecoderErrorHandler = e =>
+      console.error('[H264] Decoder error:', e),
+    private readonly onStats: DecoderStatsHandler = () => {}
+  ) {}
 
   /** Feed one raw WebSocket binary message. */
   push(buffer: ArrayBuffer): void {
@@ -166,11 +173,11 @@ export class ScrcpyH264Decoder {
 
     this.decoder?.close();
     this.decoder = new VideoDecoder({
-      output: (frame) => {
+      output: frame => {
         this.stats.decoded += 1;
         this.onFrame(frame);
       },
-      error: (e) => {
+      error: e => {
         this.onError(new Error(String(e)));
       },
     });
@@ -189,13 +196,18 @@ export class ScrcpyH264Decoder {
     this.configured = true;
   }
 
-  private handleFrame(pts: bigint, ptsAndFlags: bigint, data: Uint8Array): void {
+  private handleFrame(
+    pts: bigint,
+    ptsAndFlags: bigint,
+    data: Uint8Array
+  ): void {
     if (!this.configured || !this.decoder) {
       return;
     }
     this.stats.frames += 1;
 
-    const isKey = (ptsAndFlags & PACKET_FLAG_KEY_FRAME) !== 0n || hasIdrNal(data);
+    const isKey =
+      (ptsAndFlags & PACKET_FLAG_KEY_FRAME) !== 0n || hasIdrNal(data);
     if (isKey) {
       this.stats.keyframes += 1;
     }
@@ -219,10 +231,10 @@ export class ScrcpyH264Decoder {
     try {
       this.decoder.decode(
         new EncodedVideoChunk({
-          type: isKey ? "key" : "delta",
+          type: isKey ? 'key' : 'delta',
           timestamp: Number(pts),
           data: frameData,
-        }),
+        })
       );
       this.emitStats();
     } catch (e) {
@@ -233,7 +245,7 @@ export class ScrcpyH264Decoder {
 
   /** Release the underlying VideoDecoder. */
   close(): void {
-    if (this.decoder && this.decoder.state !== "closed") {
+    if (this.decoder && this.decoder.state !== 'closed') {
       this.decoder.close();
     }
     this.decoder = null;

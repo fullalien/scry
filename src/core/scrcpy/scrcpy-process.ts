@@ -1,5 +1,5 @@
-import { spawn } from "node:child_process";
-import { EventEmitter } from "node:events";
+import { spawn } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 
 export type ScrcpyStartOptions = {
   scrcpyPath?: string;
@@ -20,33 +20,33 @@ export class ScrcpyProcess extends EventEmitter {
   constructor(options: ScrcpyStartOptions) {
     super();
 
-    const scrcpyPath = options.scrcpyPath ?? "scrcpy";
-    const args: string[] = ["--serial", options.deviceSerial];
+    const scrcpyPath = options.scrcpyPath ?? 'scrcpy';
+    const args: string[] = ['--serial', options.deviceSerial];
 
     if (options.noDisplay) {
-      args.push("--no-display");
+      args.push('--no-display');
     }
 
     if (options.recordToStdout) {
       // Output raw H.264 Annex-B directly — no container, no ffmpeg needed.
-      args.push("--record", "-", "--record-format", "h264");
+      args.push('--record', '-', '--record-format', 'h264');
     }
 
     if (options.maxSize !== undefined) {
-      args.push("--max-size", String(options.maxSize));
+      args.push('--max-size', String(options.maxSize));
     }
 
     if (options.videoBitRate !== undefined) {
-      args.push("--video-bit-rate", options.videoBitRate);
+      args.push('--video-bit-rate', options.videoBitRate);
     }
 
     if (options.maxFps !== undefined) {
-      args.push("--max-fps", String(options.maxFps));
+      args.push('--max-fps', String(options.maxFps));
     }
 
-    const stdioMode = options.recordToStdout ? "pipe" : "ignore";
+    const stdioMode = options.recordToStdout ? 'pipe' : 'ignore';
     const child = spawn(scrcpyPath, args, {
-      stdio: ["ignore", stdioMode, "pipe"],
+      stdio: ['ignore', stdioMode, 'pipe'],
     });
 
     this.child = child;
@@ -58,23 +58,23 @@ export class ScrcpyProcess extends EventEmitter {
     this.pid = child.pid;
 
     if (options.recordToStdout && child.stdout) {
-      child.stdout.on("data", (chunk: Buffer) => {
-        this.emit("data", chunk);
+      child.stdout.on('data', (chunk: Buffer) => {
+        this.emit('data', chunk);
       });
     }
 
-    child.stderr?.on("data", (chunk: Buffer) => {
-      this.emit("log", chunk.toString());
+    child.stderr?.on('data', (chunk: Buffer) => {
+      this.emit('log', chunk.toString());
     });
 
-    child.on("exit", (code, signal) => {
+    child.on('exit', (code, signal) => {
       this._running = false;
-      this.emit("exit", code, signal);
+      this.emit('exit', code, signal);
     });
 
-    child.on("error", (err: Error) => {
+    child.on('error', (err: Error) => {
       this._running = false;
-      this.emit("error", err);
+      this.emit('error', err);
     });
   }
 
@@ -84,7 +84,7 @@ export class ScrcpyProcess extends EventEmitter {
 
   stop(): void {
     if (this._running) {
-      this.child.kill("SIGTERM");
+      this.child.kill('SIGTERM');
     }
   }
 }

@@ -1,8 +1,8 @@
-import { appendFileSync, mkdirSync } from "node:fs";
-import path from "node:path";
-import { homedir } from "node:os";
+import { appendFileSync, mkdirSync } from 'node:fs';
+import path from 'node:path';
+import { homedir } from 'node:os';
 
-export type LogLevel = "debug" | "info" | "warn" | "error";
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 const LEVEL_PRIORITY: Record<LogLevel, number> = {
   debug: 0,
@@ -12,10 +12,10 @@ const LEVEL_PRIORITY: Record<LogLevel, number> = {
 };
 
 const LEVEL_LABELS: Record<LogLevel, string> = {
-  debug: "DEBUG",
-  info: "INFO",
-  warn: "WARN",
-  error: "ERROR",
+  debug: 'DEBUG',
+  info: 'INFO',
+  warn: 'WARN',
+  error: 'ERROR',
 };
 
 export type LoggerOptions = {
@@ -25,7 +25,7 @@ export type LoggerOptions = {
 };
 
 function resolveLogPath(file: string): string {
-  if (file.startsWith("~")) {
+  if (file.startsWith('~')) {
     return path.join(homedir(), file.slice(1));
   }
   return path.resolve(file);
@@ -37,7 +37,7 @@ export class Logger {
   private readonly logToConsole: boolean;
 
   constructor(options: LoggerOptions = {}) {
-    this.minLevel = options.level ?? "info";
+    this.minLevel = options.level ?? 'info';
     this.logFile = options.file ? resolveLogPath(options.file) : null;
     this.logToConsole = options.console ?? false;
   }
@@ -46,22 +46,30 @@ export class Logger {
     return LEVEL_PRIORITY[level] >= LEVEL_PRIORITY[this.minLevel];
   }
 
-  private format(level: LogLevel, msg: string, context?: Record<string, unknown>): string {
+  private format(
+    level: LogLevel,
+    msg: string,
+    context?: Record<string, unknown>
+  ): string {
     const ts = new Date().toISOString();
     const levelLabel = LEVEL_LABELS[level];
-    const ctx = context ? ` ${JSON.stringify(context)}` : "";
+    const ctx = context ? ` ${JSON.stringify(context)}` : '';
     return `[${ts}] [${levelLabel}] ${msg}${ctx}`;
   }
 
-  private write(level: LogLevel, msg: string, context?: Record<string, unknown>): void {
+  private write(
+    level: LogLevel,
+    msg: string,
+    context?: Record<string, unknown>
+  ): void {
     if (!this.shouldLog(level)) return;
 
     const line = this.format(level, msg, context);
 
     if (this.logToConsole) {
-      if (level === "error") {
+      if (level === 'error') {
         console.error(line);
-      } else if (level === "warn") {
+      } else if (level === 'warn') {
         console.warn(line);
       } else {
         console.log(line);
@@ -71,7 +79,7 @@ export class Logger {
     if (this.logFile) {
       try {
         mkdirSync(path.dirname(this.logFile), { recursive: true });
-        appendFileSync(this.logFile, `${line}\n`, "utf8");
+        appendFileSync(this.logFile, `${line}\n`, 'utf8');
       } catch {
         // Silently fail if we can't write to the log file
       }
@@ -79,19 +87,19 @@ export class Logger {
   }
 
   debug(msg: string, context?: Record<string, unknown>): void {
-    this.write("debug", msg, context);
+    this.write('debug', msg, context);
   }
 
   info(msg: string, context?: Record<string, unknown>): void {
-    this.write("info", msg, context);
+    this.write('info', msg, context);
   }
 
   warn(msg: string, context?: Record<string, unknown>): void {
-    this.write("warn", msg, context);
+    this.write('warn', msg, context);
   }
 
   error(msg: string, context?: Record<string, unknown>): void {
-    this.write("error", msg, context);
+    this.write('error', msg, context);
   }
 
   appendCliLog(record: {
@@ -114,7 +122,7 @@ export class Logger {
 
     try {
       mkdirSync(path.dirname(this.logFile), { recursive: true });
-      appendFileSync(this.logFile, `${JSON.stringify(finalRecord)}\n`, "utf8");
+      appendFileSync(this.logFile, `${JSON.stringify(finalRecord)}\n`, 'utf8');
     } catch {
       // Silently fail if we can't write to the log file
     }

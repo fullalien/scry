@@ -7,29 +7,29 @@
  *   bytes 9+   : encoded payload bytes
  */
 
-import fs from "node:fs";
-import net from "node:net";
-import { EventEmitter } from "node:events";
-import type { ChildProcess } from "node:child_process";
+import fs from 'node:fs';
+import net from 'node:net';
+import { EventEmitter } from 'node:events';
+import type { ChildProcess } from 'node:child_process';
 import {
   adbPush,
   adbShell,
   adbForward,
   adbForwardRemove,
   adbShellSpawn,
-} from "../adb/adb-client.js";
-import { getServerJarPath, SERVER_VERSION } from "./server-jar.js";
-import { getLogger } from "../logger/logger.js";
+} from '../adb/adb-client.js';
+import { getServerJarPath, SERVER_VERSION } from './server-jar.js';
+import { getLogger } from '../logger/logger.js';
 
-const REMOTE_JAR = "/data/local/tmp/scrcpy-server-v4.0.jar";
+const REMOTE_JAR = '/data/local/tmp/scrcpy-server-v4.0.jar';
 const FORWARD_PORT = 27183;
 const DEFAULT_SCID = 0;
 
 // scrcpy-server v4.0 packet flags (matching Streamer.java).
-const PKT_FLAG_SESSION = 0x8000000000000000n;   // bit 63
-const PKT_FLAG_CONFIG = 0x4000000000000000n;     // bit 62
-const PKT_FLAG_KEY_FRAME = 0x2000000000000000n;  // bit 61
-const PKT_PTS_MASK = 0x1fffffffffffffffn;         // lower 61 bits
+const PKT_FLAG_SESSION = 0x8000000000000000n; // bit 63
+const PKT_FLAG_CONFIG = 0x4000000000000000n; // bit 62
+const PKT_FLAG_KEY_FRAME = 0x2000000000000000n; // bit 61
+const PKT_PTS_MASK = 0x1fffffffffffffffn; // lower 61 bits
 const NAL_IDR = 5;
 const VIDEO_MSG_TYPE = 0x01;
 
@@ -59,33 +59,36 @@ export type ScrcpyServerStats = {
 };
 
 type DeviceMessage =
-  | { type: "clipboard"; text: string }
-  | { type: "ack_clipboard"; sequence: string }
-  | { type: "uhid_output"; id: number; data: Buffer };
+  | { type: 'clipboard'; text: string }
+  | { type: 'ack_clipboard'; sequence: string }
+  | { type: 'uhid_output'; id: number; data: Buffer };
 
 function toScidHex(scid: number): string {
   const normalized = (scid & 0x7fffffff) >>> 0;
-  return normalized.toString(16).padStart(8, "0");
+  return normalized.toString(16).padStart(8, '0');
 }
 
 function codecIdToText(codecId: number): string {
   const b = Buffer.allocUnsafe(4);
   b.writeUInt32BE(codecId, 0);
-  const text = b.toString("ascii").replace(/\0/g, "");
-  return text.length > 0 ? text : `0x${codecId.toString(16).padStart(8, "0")}`;
+  const text = b.toString('ascii').replace(/\0/g, '');
+  return text.length > 0 ? text : `0x${codecId.toString(16).padStart(8, '0')}`;
 }
 
 /** Parse bit-rate values like "8M", "4000K", or plain numbers → bps integer. */
-function parseBitRate(value: number | string | undefined, defaultBps = 4_000_000): number {
+function parseBitRate(
+  value: number | string | undefined,
+  defaultBps = 4_000_000
+): number {
   if (value === undefined || value === null) return defaultBps;
-  if (typeof value === "number") return value;
+  if (typeof value === 'number') return value;
   const match = /^(\d+(?:\.\d+)?)\s*([KkMmGg])?$/.exec(value.trim());
   if (!match) return defaultBps;
   const n = parseFloat(match[1]);
-  const suffix = (match[2] ?? "").toUpperCase();
-  if (suffix === "K") return Math.round(n * 1_000);
-  if (suffix === "M") return Math.round(n * 1_000_000);
-  if (suffix === "G") return Math.round(n * 1_000_000_000);
+  const suffix = (match[2] ?? '').toUpperCase();
+  if (suffix === 'K') return Math.round(n * 1_000);
+  if (suffix === 'M') return Math.round(n * 1_000_000);
+  if (suffix === 'G') return Math.round(n * 1_000_000_000);
   return Math.round(n);
 }
 
@@ -102,16 +105,16 @@ class SocketReader {
   }> = [];
 
   constructor(private readonly socket: net.Socket) {
-    socket.on("data", (chunk: Buffer) => {
+    socket.on('data', (chunk: Buffer) => {
       this.buf = Buffer.concat([this.buf, chunk]);
       this.drain();
     });
-    socket.on("error", (err) => {
+    socket.on('error', err => {
       for (const p of this.pending) p.reject(err);
       this.pending.length = 0;
     });
-    socket.on("close", () => {
-      const err = new Error("Video socket closed");
+    socket.on('close', () => {
+      const err = new Error('Video socket closed');
       for (const p of this.pending) p.reject(err);
       this.pending.length = 0;
     });
@@ -140,9 +143,9 @@ class SocketReader {
 
 function tcpConnect(port: number): Promise<net.Socket> {
   return new Promise((resolve, reject) => {
-    const s = net.createConnection({ port, host: "127.0.0.1" });
-    s.once("error", reject);
-    s.once("connect", () => {
+    const s = net.createConnection({ port, host: '127.0.0.1' });
+    s.once('error', reject);
+    s.once('connect', () => {
       // The adb forwarder may accept the TCP connection but immediately close it
       // when the abstract socket on the device side isn't listening yet.
       // Wait 200ms: if the socket closes in that window → reject so caller retries;
@@ -154,17 +157,20 @@ function tcpConnect(port: number): Promise<net.Socket> {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
-        s.off("close", onClose);
-        s.off("error", onEarlyError);
+        s.off('close', onClose);
+        s.off('error', onEarlyError);
         fn();
       };
 
       const timer = setTimeout(() => settle(() => resolve(s)), 200);
-      const onClose = () => settle(() => reject(new Error("Socket closed immediately after connect")));
+      const onClose = () =>
+        settle(() =>
+          reject(new Error('Socket closed immediately after connect'))
+        );
       const onEarlyError = (err: Error) => settle(() => reject(err));
 
-      s.once("close", onClose);
-      s.once("error", onEarlyError);
+      s.once('close', onClose);
+      s.once('error', onEarlyError);
     });
   });
 }
@@ -172,7 +178,7 @@ function tcpConnect(port: number): Promise<net.Socket> {
 async function tcpConnectWithRetry(
   port: number,
   maxAttempts = 40,
-  delayMs = 300,
+  delayMs = 300
 ): Promise<net.Socket> {
   let last: Error | undefined;
   for (let i = 0; i < maxAttempts; i++) {
@@ -187,7 +193,7 @@ async function tcpConnectWithRetry(
 }
 
 function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
+  return new Promise(r => setTimeout(r, ms));
 }
 
 function hasIdrNal(data: Buffer): boolean {
@@ -232,7 +238,7 @@ export class ScrcpyServer extends EventEmitter {
   private _running = false;
   private controlEnabled = false;
   private audioEnabled = false;
-  private deviceSerial = "";
+  private deviceSerial = '';
   private shellExitMessage: string | undefined;
   private latestCodecConfigFrame: Buffer | undefined;
   private latestKeyFrame: Buffer | undefined;
@@ -268,7 +274,8 @@ export class ScrcpyServer extends EventEmitter {
     this.controlEnabled = options.control ?? false;
     this.audioEnabled = options.audio ?? false;
     this.scid = options.scid ?? DEFAULT_SCID;
-    const socketName = this.scid === DEFAULT_SCID ? "scrcpy" : `scrcpy_${toScidHex(this.scid)}`;
+    const socketName =
+      this.scid === DEFAULT_SCID ? 'scrcpy' : `scrcpy_${toScidHex(this.scid)}`;
 
     // 1. Get bundled jar path
     const localJar = getServerJarPath();
@@ -279,10 +286,10 @@ export class ScrcpyServer extends EventEmitter {
       try {
         const out = await adbShell(
           options.deviceSerial,
-          `stat -c %s ${REMOTE_JAR} 2>/dev/null || echo missing`,
+          `stat -c %s ${REMOTE_JAR} 2>/dev/null || echo missing`
         );
         const trimmed = out.trim();
-        if (trimmed === "missing" || trimmed === "") return true;
+        if (trimmed === 'missing' || trimmed === '') return true;
         return parseInt(trimmed, 10) !== localJarSize;
       } catch {
         return true;
@@ -293,11 +300,16 @@ export class ScrcpyServer extends EventEmitter {
       getLogger().info(`[ScrcpyServer] Pushing jar (${localJarSize} bytes)…`);
       await adbPush(options.deviceSerial, localJar, REMOTE_JAR);
     } else {
-      getLogger().info("[ScrcpyServer] Jar already up-to-date on device, skipping push.");
+      getLogger().info(
+        '[ScrcpyServer] Jar already up-to-date on device, skipping push.'
+      );
     }
 
     // 3. Kill any stale scrcpy-server process on the device to avoid socket conflicts
-    await adbShell(options.deviceSerial, "pkill -f com.genymobile.scrcpy.Server 2>/dev/null; true").catch(() => {});
+    await adbShell(
+      options.deviceSerial,
+      'pkill -f com.genymobile.scrcpy.Server 2>/dev/null; true'
+    ).catch(() => {});
 
     // 4. Set up port forward (remove any stale forward first)
     await adbForwardRemove(options.deviceSerial, FORWARD_PORT);
@@ -306,39 +318,39 @@ export class ScrcpyServer extends EventEmitter {
     // 5. Launch the scrcpy Java server (runs indefinitely — do NOT await)
     this.shellProcess = adbShellSpawn(options.deviceSerial, [
       `CLASSPATH=${REMOTE_JAR}`,
-      "app_process",
-      "/",
-      "com.genymobile.scrcpy.Server",
+      'app_process',
+      '/',
+      'com.genymobile.scrcpy.Server',
       SERVER_VERSION,
       ...(this.scid === DEFAULT_SCID ? [] : [`scid=${toScidHex(this.scid)}`]),
-      "tunnel_forward=true",
-      "video_codec=h264",
+      'tunnel_forward=true',
+      'video_codec=h264',
       `max_size=${options.maxSize ?? 1080}`,
       `max_fps=${options.maxFps ?? 60}`,
       `video_bit_rate=${parseBitRate(options.videoBitRate)}`,
       `audio=${this.audioEnabled}`,
       `control=${this.controlEnabled}`,
-      "send_device_meta=true",
-      "send_stream_meta=true",
-      "send_frame_meta=true",
-      "send_dummy_byte=true",
+      'send_device_meta=true',
+      'send_stream_meta=true',
+      'send_frame_meta=true',
+      'send_dummy_byte=true',
     ]);
 
-    this.shellProcess.stdout?.on("data", (chunk: Buffer) => {
+    this.shellProcess.stdout?.on('data', (chunk: Buffer) => {
       const text = chunk.toString();
       process.stderr.write(`[scrcpy-server:out] ${text}`);
     });
-    this.shellProcess.stderr?.on("data", (chunk: Buffer) => {
+    this.shellProcess.stderr?.on('data', (chunk: Buffer) => {
       const text = chunk.toString();
       process.stderr.write(`[scrcpy-server] ${text}`);
-      this.emit("log", text);
+      this.emit('log', text);
     });
 
-    this.shellProcess.on("exit", (code, signal) => {
+    this.shellProcess.on('exit', (code, signal) => {
       this.shellExitMessage = `code=${code} signal=${signal}`;
       if (this._running) {
         this._running = false;
-        this.emit("exit", code, signal);
+        this.emit('exit', code, signal);
       }
     });
 
@@ -367,7 +379,7 @@ export class ScrcpyServer extends EventEmitter {
 
     // 2. Read 64-byte device name (null-padded UTF-8)
     const deviceNameBuf = await this.readOrThrowShellError(64);
-    const deviceName = deviceNameBuf.toString("utf8").replace(/\0/g, "");
+    const deviceName = deviceNameBuf.toString('utf8').replace(/\0/g, '');
 
     // 3. Read video codec id (4 bytes only — v4.0 Streamer.writeVideoHeader).
     const codecIdBuf = await this.readOrThrowShellError(4);
@@ -381,20 +393,26 @@ export class ScrcpyServer extends EventEmitter {
     const videoHeight = sessionHeader.readUInt32BE(8);
     const isSession = (sessionFlags & 0x80000000) !== 0;
     if (!isSession) {
-      throw new Error(`[ScrcpyServer] Expected session header but got flags=0x${sessionFlags.toString(16)}`);
+      throw new Error(
+        `[ScrcpyServer] Expected session header but got flags=0x${sessionFlags.toString(16)}`
+      );
     }
 
     if (videoCodecId === 0x00000000) {
-      throw new Error("[ScrcpyServer] Device disabled the video stream (codec_id=0)");
+      throw new Error(
+        '[ScrcpyServer] Device disabled the video stream (codec_id=0)'
+      );
     }
     if (videoCodecId === 0x00000001) {
-      throw new Error("[ScrcpyServer] Device reported video codec configuration error (codec_id=1)");
+      throw new Error(
+        '[ScrcpyServer] Device reported video codec configuration error (codec_id=1)'
+      );
     }
 
     getLogger().info(
       `[ScrcpyServer] Connected (${socketName}) — device: "${deviceName}", video codec: "${codecIdToText(
-        videoCodecId,
-      )}" ${videoWidth}x${videoHeight}`,
+        videoCodecId
+      )}" ${videoWidth}x${videoHeight}`
     );
 
     if (this.audioEnabled) {
@@ -403,11 +421,17 @@ export class ScrcpyServer extends EventEmitter {
       const audioCodecMeta = await audioReader.read(4);
       const audioCodecId = audioCodecMeta.readUInt32BE(0);
       if (audioCodecId === 0x00000000) {
-        getLogger().warn("[ScrcpyServer] Device disabled audio stream (codec_id=0)");
+        getLogger().warn(
+          '[ScrcpyServer] Device disabled audio stream (codec_id=0)'
+        );
       } else if (audioCodecId === 0x00000001) {
-        getLogger().warn("[ScrcpyServer] Device reported audio codec configuration error (codec_id=1)");
+        getLogger().warn(
+          '[ScrcpyServer] Device reported audio codec configuration error (codec_id=1)'
+        );
       } else {
-        getLogger().info(`[ScrcpyServer] Audio codec: "${codecIdToText(audioCodecId)}"`);
+        getLogger().info(
+          `[ScrcpyServer] Audio codec: "${codecIdToText(audioCodecId)}"`
+        );
       }
       audioSocket.destroy();
     }
@@ -426,10 +450,12 @@ export class ScrcpyServer extends EventEmitter {
     try {
       return await this.videoReader.read(n);
     } catch (err) {
-      const msg = this.shellExitMessage ?? (err instanceof Error ? err.message : String(err));
+      const msg =
+        this.shellExitMessage ??
+        (err instanceof Error ? err.message : String(err));
       throw new Error(
         `[ScrcpyServer] Video socket closed during handshake (reading ${n}B). ` +
-          `Shell exit: ${msg}. Check server logs above.`,
+          `Shell exit: ${msg}. Check server logs above.`
       );
     }
   }
@@ -467,7 +493,8 @@ export class ScrcpyServer extends EventEmitter {
           throw new Error(`[ScrcpyServer] Invalid video packet size ${size}`);
         }
 
-        const data = size > 0 ? await this.videoReader.read(size) : Buffer.alloc(0);
+        const data =
+          size > 0 ? await this.videoReader.read(size) : Buffer.alloc(0);
         streamOffset += size;
 
         const isKeyFrame = isKey || hasIdrNal(data);
@@ -490,17 +517,21 @@ export class ScrcpyServer extends EventEmitter {
           this.latestKeyFrame = frame;
         }
 
-        this.emit("data", frame);
+        this.emit('data', frame);
       }
     } catch (err) {
       if (this._running) {
         this._running = false;
         const error =
           err instanceof Error
-            ? new Error(`[ScrcpyServer] Stream failed after ${this.stats.packets} packet(s): ${err.message}`)
-            : new Error(`[ScrcpyServer] Stream failed after ${this.stats.packets} packet(s): ${String(err)}`);
-        this.emit("error", error);
-        this.emit("exit", 1, null);
+            ? new Error(
+                `[ScrcpyServer] Stream failed after ${this.stats.packets} packet(s): ${err.message}`
+              )
+            : new Error(
+                `[ScrcpyServer] Stream failed after ${this.stats.packets} packet(s): ${String(err)}`
+              );
+        this.emit('error', error);
+        this.emit('exit', 1, null);
       }
     }
   }
@@ -514,33 +545,35 @@ export class ScrcpyServer extends EventEmitter {
       while (this._running && this.controlReader) {
         const msg = await this.readOneDeviceMessage(this.controlReader);
         this.stats.deviceMessages += 1;
-        this.emit("device-message", msg);
+        this.emit('device-message', msg);
       }
     } catch (err) {
       if (!this._running) {
         return;
       }
       const message = err instanceof Error ? err.message : String(err);
-      this.emit("log", `[ScrcpyServer] Control reader stopped: ${message}`);
+      this.emit('log', `[ScrcpyServer] Control reader stopped: ${message}`);
     }
   }
 
-  private async readOneDeviceMessage(reader: SocketReader): Promise<DeviceMessage> {
+  private async readOneDeviceMessage(
+    reader: SocketReader
+  ): Promise<DeviceMessage> {
     const type = (await reader.read(1)).readUInt8(0);
 
     if (type === DEVICE_MSG_TYPE_CLIPBOARD) {
       const len = (await reader.read(4)).readUInt32BE(0);
       const textBuf = len > 0 ? await reader.read(len) : Buffer.alloc(0);
       return {
-        type: "clipboard",
-        text: textBuf.toString("utf8"),
+        type: 'clipboard',
+        text: textBuf.toString('utf8'),
       };
     }
 
     if (type === DEVICE_MSG_TYPE_ACK_CLIPBOARD) {
       const sequence = (await reader.read(8)).readBigUInt64BE(0);
       return {
-        type: "ack_clipboard",
+        type: 'ack_clipboard',
         sequence: sequence.toString(),
       };
     }
@@ -551,7 +584,7 @@ export class ScrcpyServer extends EventEmitter {
       const size = header.readUInt16BE(2);
       const data = size > 0 ? await reader.read(size) : Buffer.alloc(0);
       return {
-        type: "uhid_output",
+        type: 'uhid_output',
         id,
         data,
       };
@@ -561,7 +594,11 @@ export class ScrcpyServer extends EventEmitter {
   }
 
   sendControl(data: Buffer | Uint8Array): void {
-    if (!this.controlEnabled || !this.controlSocket || this.controlSocket.destroyed) {
+    if (
+      !this.controlEnabled ||
+      !this.controlSocket ||
+      this.controlSocket.destroyed
+    ) {
       return;
     }
 
@@ -574,8 +611,8 @@ export class ScrcpyServer extends EventEmitter {
     this._running = false;
     this.videoSocket?.destroy();
     this.controlSocket?.destroy();
-    this.shellProcess?.kill("SIGTERM");
+    this.shellProcess?.kill('SIGTERM');
     adbForwardRemove(this.deviceSerial, FORWARD_PORT).catch(() => {});
-    this.emit("exit", 0, null);
+    this.emit('exit', 0, null);
   }
 }

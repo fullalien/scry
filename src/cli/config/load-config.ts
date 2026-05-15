@@ -1,12 +1,17 @@
-import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import path from "node:path";
-import { appConfigSchema, type AppConfig } from "./schema.js";
+import { existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import path from 'node:path';
+import { appConfigSchema, type AppConfig } from './schema.js';
 
-const DEFAULT_CONFIG_PATH = path.join(homedir(), ".config", "scrcpy-web", "config.json");
+const DEFAULT_CONFIG_PATH = path.join(
+  homedir(),
+  '.config',
+  'scrcpy-web',
+  'config.json'
+);
 
 function expandHome(filePath: string): string {
-  if (!filePath.startsWith("~/")) {
+  if (!filePath.startsWith('~/')) {
     return filePath;
   }
   return path.join(homedir(), filePath.slice(2));
@@ -21,7 +26,10 @@ export function loadConfig(): AppConfig {
 
   if (existsSync(configPath)) {
     try {
-      fileConfig = JSON.parse(readFileSync(configPath, "utf8")) as Record<string, unknown>;
+      fileConfig = JSON.parse(readFileSync(configPath, 'utf8')) as Record<
+        string,
+        unknown
+      >;
     } catch {
       fileConfig = {};
     }
