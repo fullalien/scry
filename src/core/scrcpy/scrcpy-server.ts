@@ -278,13 +278,20 @@ export class ScrcpyServer extends EventEmitter {
     }
 
     this.shellProcess.stdout?.on('data', (chunk: Buffer) => {
-      const text = chunk.toString();
-      process.stderr.write(`[scrcpy-server:out] ${text}`);
+      const text = chunk.toString().trim();
+      if (text) {
+        logger.info('[scrcpy-server:out] ' + text, {
+          deviceSerial: this.deviceSerial,
+        });
+      }
     });
     this.shellProcess.stderr?.on('data', (chunk: Buffer) => {
-      const text = chunk.toString();
-      process.stderr.write(`[scrcpy-server] ${text}`);
-      this.emit('log', text);
+      const text = chunk.toString().trim();
+      if (text) {
+        logger.error('[scrcpy-server] ' + text, {
+          deviceSerial: this.deviceSerial,
+        });
+      }
     });
 
     this.shellProcess.on('exit', (code, signal) => {

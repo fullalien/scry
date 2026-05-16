@@ -1,10 +1,10 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { homedir } from 'node:os';
+import { CONFIG_DIR } from '../constants.js';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
-const DEFAULT_LOG_FILE = path.join(homedir(), 'scrcpy-web', 'logs', 'app.log');
+const DEFAULT_LOG_FILE = path.join(CONFIG_DIR, 'logs', 'app.log');
 
 const LEVEL_PRIORITY: Record<LogLevel, number> = {
   debug: 0,
@@ -82,8 +82,10 @@ export class Logger {
     try {
       mkdirSync(path.dirname(DEFAULT_LOG_FILE), { recursive: true });
       appendFileSync(DEFAULT_LOG_FILE, `${line}\n`, 'utf8');
-    } catch {
-      // Silently fail if we can't write to the log file
+    } catch (err) {
+      // Log to stderr so file write failures are visible during development
+      const msg = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`[logger] Failed to write log file: ${msg}\n`);
     }
   }
 
