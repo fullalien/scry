@@ -1,8 +1,62 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { ScrcpyH264Decoder } from '../../../lib/codec/h264.js';
-import { SCRCPY_DEVICE_STREAM_PATH } from '../../../lib/shared/path.constants.js';
+import {
+  DEVICES_PATH,
+  SCRCPY_DEVICE_STREAM_PATH,
+} from '../../../lib/shared/path.constants.js';
 import './device.css';
+
+type AdbDevice = {
+  id: string;
+  state: string;
+  model?: string;
+  brand?: string;
+  androidVersion?: string;
+  screenRes?: string;
+  screenDensity?: string;
+};
+
+type Size = {
+  width: number;
+  height: number;
+};
+
+const DEFAULT_FALLBACK_DPI = 420;
+const TOP_BAR_HEIGHT = 52;
+const STACK_GAP = 12;
+
+function parseResolution(value?: string): Size | null {
+  if (!value) return null;
+  const match = value.match(/(\d+)\s*x\s*(\d+)/i);
+  if (!match) return null;
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
+  if (width <= 0 || height <= 0) return null;
+  return { width, height };
+}
+
+function parseDensity(value?: string): number | null {
+  if (!value) return null;
+  const match = value.match(/(\d+(?:\.\d+)?)/);
+  if (!match) return null;
+  const density = Number(match[1]);
+  if (!Number.isFinite(density) || density <= 0) return null;
+  return density;
+}
+
+function toCssInchPixels(px: number, density: number): number {
+  return (px * 96) / density;
+}
+
+function alignOrientation(target: Size, reference: Size): Size {
+  const sameOrientation =
+    (target.width >= target.height && reference.width >= reference.height) ||
+    (target.width < target.height && reference.width < reference.height);
+  if (sameOrientation) return target;
+  return { width: target.height, height: target.width };
+}
 
 function getDeviceSerialFromUrl(): string | null {
   const path = window.location.pathname;
@@ -13,7 +67,97 @@ function getDeviceSerialFromUrl(): string | null {
 function DeviceApp() {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const [deviceSerial, setDeviceSerial] = React.useState<string | null>(null);
+  const [deviceInfo, setDeviceInfo] = React.useState<AdbDevice | null>(null);
+  const [viewport, setViewport] = React.useState<Size>({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
+  const [frameSize, setFrameSize] = React.useState<Size | null>(null);
   const [streamError, setStreamError] = React.useState<string | null>(null);
+
+  const displaySize = React.useMemo<Size>(() => {
+    const resolution = parseResolution(deviceInfo?.screenRes);
+    const density = parseDensity(deviceInfo?.screenDensity);
+
+    if (resolution && density) {
+      const physical: Size = {
+        width: toCssInchPixels(resolution.width, density),
+        height: toCssInchPixels(resolution.height, density),
+      };
+      if (frameSize) {
+        const aligned = alignOrientation(physical, frameSize);
+        // Use frameSize aspect ratio to avoid black bars when scrcpy
+        // outputs a slightly different resolution than the device reports.
+        const frameAspect = frameSize.height / frameSize.width;
+        return { width: aligned.width, height: aligned.width * frameAspect };
+      }
+      return physical;
+    }
+
+    if (frameSize) {
+      return {
+        width: toCssInchPixels(frameSize.width, DEFAULT_FALLBACK_DPI),
+        height: toCssInchPixels(frameSize.height, DEFAULT_FALLBACK_DPI),
+      };
+    }
+
+    return { width: 360, height: 780 };
+  }, [deviceInfo?.screenDensity, deviceInfo?.screenRes, frameSize]);
+
+  const toolbarWidth = React.useMemo(() => {
+    const minWidth = 420;
+    const extra = 120;
+    return Math.max(minWidth, displaySize.width + extra);
+  }, [displaySize.width]);
+
+  const stackSize = React.useMemo<Size>(() => {
+    return {
+      width: Math.max(displaySize.width, toolbarWidth),
+      height: displaySize.height + TOP_BAR_HEIGHT + STACK_GAP,
+    };
+  }, [displaySize.height, displaySize.width, toolbarWidth]);
+
+  const stackScale = React.useMemo(() => {
+    const horizontalPadding = 40;
+    const verticalPadding = 40;
+    const availableWidth = Math.max(120, viewport.width - horizontalPadding);
+    const availableHeight = Math.max(120, viewport.height - verticalPadding);
+    return Math.min(1, availableWidth / stackSize.width, availableHeight / stackSize.height);
+  }, [stackSize.height, stackSize.width, viewport.height, viewport.width]);
+
+  React.useEffect(() => {
+    const onResize = () => {
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!deviceSerial) return;
+
+    let cancelled = false;
+    const loadDeviceInfo = async () => {
+      try {
+        const response = await fetch(DEVICES_PATH);
+        if (!response.ok) return;
+        const payload = (await response.json()) as { devices?: AdbDevice[] };
+        if (cancelled) return;
+        const found = payload.devices?.find(d => d.id === deviceSerial) ?? null;
+        setDeviceInfo(found);
+      } catch {
+        // Keep UI usable even when device metadata cannot be loaded.
+      }
+    };
+
+    void loadDeviceInfo();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [deviceSerial]);
 
   React.useEffect(() => {
     const serial = getDeviceSerialFromUrl();
@@ -45,6 +189,10 @@ function DeviceApp() {
         ) {
           canvas.width = frame.displayWidth;
           canvas.height = frame.displayHeight;
+          setFrameSize({
+            width: frame.displayWidth,
+            height: frame.displayHeight,
+          });
         }
         ctx.drawImage(frame, 0, 0);
         frame.close();
@@ -86,21 +234,72 @@ function DeviceApp() {
     };
   }, []);
 
+  const toolbarTitle =
+    deviceInfo?.brand && deviceInfo?.model
+      ? `${deviceInfo.brand} ${deviceInfo.model}`
+      : deviceInfo?.model || deviceSerial || 'Unknown device';
+
+  const toolbarMeta = [
+    deviceInfo?.androidVersion ? `Android ${deviceInfo.androidVersion}` : null,
+    frameSize ? `${frameSize.width}x${frameSize.height}` : deviceInfo?.screenRes || null,
+    deviceInfo?.screenDensity ? `${deviceInfo.screenDensity} dpi` : null,
+  ]
+    .filter(Boolean)
+    .join('  •  ');
+
   return (
-    <main style={{ fontFamily: 'ui-sans-serif, system-ui', padding: 24 }}>
-      <h1>Device: {deviceSerial || 'Unknown'}</h1>
-      {streamError && (
-        <p style={{ color: '#b91c1c', fontSize: '0.85rem', margin: '4px 0' }}>
-          Stream error: {streamError}
-        </p>
-      )}
-      <canvas
-        ref={canvasRef}
-        style={{
-          display: 'block',
-          background: '#000',
-        }}
-      />
+    <main className="device-page">
+      <div className="device-stage">
+        <div
+          className="device-stack"
+          style={{
+            width: `${stackSize.width}px`,
+            height: `${stackSize.height}px`,
+            transform: `scale(${stackScale})`,
+          }}
+        >
+          <header
+            className="device-toolbar"
+            role="status"
+            aria-live="polite"
+            style={{ width: `${toolbarWidth}px` }}
+          >
+            <div className="toolbar-left">
+              <span className="toolbar-title">{toolbarTitle}</span>
+              {toolbarMeta && <span className="toolbar-meta">{toolbarMeta}</span>}
+            </div>
+            <div className="toolbar-right" aria-hidden="true">
+              <span className="toolbar-pill">H.264</span>
+              <span className="toolbar-pill toolbar-pill--active">MJPEG</span>
+              <span className="toolbar-icon">⌂</span>
+              <span className="toolbar-icon">◍</span>
+              <span className="toolbar-icon">⧉</span>
+            </div>
+          </header>
+
+          <section
+            className="device-screen"
+            style={{
+              width: `${displaySize.width}px`,
+              height: `${displaySize.height}px`,
+              // Compensate for the parent scale() transform so the ring
+              // always renders as exactly 2 px wide on screen.
+              boxShadow: [
+                `0 0 0 ${2 / stackScale}px rgb(20 27 38 / 78%)`,
+                `0 0 0 ${1 / stackScale}px rgb(255 255 255 / 18%) inset`,
+                `0 ${20 / stackScale}px ${46 / stackScale}px rgb(14 20 31 / 32%)`,
+              ].join(', '),
+            }}
+          >
+            <canvas ref={canvasRef} className="device-canvas" />
+            {!frameSize && !streamError && (
+              <div className="device-placeholder">Waiting for stream...</div>
+            )}
+          </section>
+
+          {streamError && <p className="device-error">Stream error: {streamError}</p>}
+        </div>
+      </div>
     </main>
   );
 }
