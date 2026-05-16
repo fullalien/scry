@@ -125,7 +125,6 @@ body,
 
 .device-screen {
 	position: relative;
-	border-radius: 26px;
 	overflow: hidden;
 	background: black;
 	/* box-shadow is set via inline style so the ring width can be

@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { Squircle } from '@squircle-js/react';
 import { ScrcpyH264Decoder } from '../../../lib/codec/h264.js';
 import {
   DEVICES_PATH,
@@ -25,6 +26,8 @@ type Size = {
 const DEFAULT_FALLBACK_DPI = 420;
 const TOP_BAR_HEIGHT = 52;
 const STACK_GAP = 12;
+const BORDER_RADIUS = 18;
+const BORDER_WIDTH = 4;
 
 function parseResolution(value?: string): Size | null {
   if (!value) return null;
@@ -277,25 +280,32 @@ function DeviceApp() {
             </div>
           </header>
 
-          <section
-            className="device-screen"
+          <Squircle
+            cornerRadius={BORDER_RADIUS}
+            cornerSmoothing={0.8}
             style={{
-              width: `${displaySize.width}px`,
-              height: `${displaySize.height}px`,
-              // Compensate for the parent scale() transform so the ring
-              // always renders as exactly 2 px wide on screen.
-              boxShadow: [
-                `0 0 0 ${2 / stackScale}px rgb(20 27 38 / 78%)`,
-                `0 0 0 ${1 / stackScale}px rgb(255 255 255 / 18%) inset`,
-                `0 ${20 / stackScale}px ${46 / stackScale}px rgb(14 20 31 / 32%)`,
-              ].join(', '),
+              padding: `${BORDER_WIDTH}px`,
+              background: 'black',
             }}
           >
-            <canvas ref={canvasRef} className="device-canvas" />
-            {!frameSize && !streamError && (
-              <div className="device-placeholder">Waiting for stream...</div>
-            )}
-          </section>
+            <Squircle
+              cornerRadius={BORDER_RADIUS - BORDER_WIDTH}
+              cornerSmoothing={0.8}
+            >
+              <div
+                className="device-screen"
+                style={{
+                  width: `${displaySize.width}px`,
+                  height: `${displaySize.height}px`,
+                }}>
+                <canvas ref={canvasRef} className="device-canvas" />
+                {!frameSize && !streamError && (
+                  <div className="device-placeholder">Waiting for stream...</div>
+                )}
+                <span>${displaySize.width} ${displaySize.height}</span>
+              </div>
+            </Squircle>
+          </Squircle>
 
           {streamError && <p className="device-error">Stream error: {streamError}</p>}
         </div>
