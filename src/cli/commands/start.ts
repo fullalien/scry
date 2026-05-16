@@ -5,7 +5,10 @@ import path from 'node:path';
 import http from 'node:http';
 import { serverStateManager } from '../../core/server-state.js';
 import { homedir } from 'node:os';
-import { DEFAULT_HOST, DEFAULT_PORT } from '../../core/config/config.constants.js';
+import {
+  DEFAULT_HOST,
+  DEFAULT_PORT,
+} from '../../core/config/config.constants.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -38,11 +41,23 @@ export function registerStartCommand(program: Command) {
       }
 
       const binPath = path.resolve(__dirname, '../../bin.js');
-      const child = spawn(process.execPath, [binPath, 'start', '--foreground', '--host', host, '--port', String(port)], {
-        cwd: homedir(),
-        detached: true,
-        stdio: 'inherit',
-      });
+      const child = spawn(
+        process.execPath,
+        [
+          binPath,
+          'start',
+          '--foreground',
+          '--host',
+          host,
+          '--port',
+          String(port),
+        ],
+        {
+          cwd: homedir(),
+          detached: true,
+          stdio: 'inherit',
+        }
+      );
 
       // Wait for server to become ready
       const ready = await waitForServer(host, port, 15_000);
@@ -66,7 +81,11 @@ export function registerStartCommand(program: Command) {
     });
 }
 
-async function waitForServer(host: string, port: number, timeoutMs: number): Promise<boolean> {
+async function waitForServer(
+  host: string,
+  port: number,
+  timeoutMs: number
+): Promise<boolean> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -78,10 +97,13 @@ async function waitForServer(host: string, port: number, timeoutMs: number): Pro
 
 function tryHealthCheck(host: string, port: number): Promise<boolean> {
   return new Promise(resolve => {
-    const req = http.get(`http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${port}/api/health`, res => {
-      res.resume();
-      res.on('end', () => resolve(res.statusCode === 200));
-    });
+    const req = http.get(
+      `http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${port}/api/health`,
+      res => {
+        res.resume();
+        res.on('end', () => resolve(res.statusCode === 200));
+      }
+    );
     req.on('error', () => resolve(false));
     req.setTimeout(2000, () => {
       req.destroy();

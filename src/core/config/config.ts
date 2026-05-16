@@ -4,7 +4,6 @@ import { ConfigSchema, type AppConfig } from './schema.js';
 import { CONFIG_PATH } from './config.constants.js';
 
 export function loadConfig(): AppConfig {
-
   let fileConfig: Record<string, unknown> = {};
 
   if (existsSync(CONFIG_PATH)) {

@@ -15,7 +15,9 @@ export function registerStatusCommand(program: Command) {
 
       console.log(chalk.green('Server is running'));
       console.log(`${chalk.bold('PID:')}       ${state.pid}`);
-      console.log(`${chalk.bold('Address:')}   ${chalk.cyan(`http://${state.host}:${state.port}`)}`);
+      console.log(
+        `${chalk.bold('Address:')}   ${chalk.cyan(`http://${state.host}:${state.port}`)}`
+      );
       console.log(`${chalk.bold('Started:')}   ${state.startedAt}`);
     });
 }

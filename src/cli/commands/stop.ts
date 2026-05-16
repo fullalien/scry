@@ -20,7 +20,7 @@ export function registerStopCommand(program: Command) {
         return;
       }
 
-      console.log(`Sent SIGTERM to server (PID ${state.pid}).`);
+      console.log(`Server stopped.`);
       serverStateManager.clear();
     });
 }

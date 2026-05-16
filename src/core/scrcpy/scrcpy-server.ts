@@ -419,9 +419,7 @@ export class ScrcpyServer extends EventEmitter {
       const audioCodecMeta = await audioReader.read(4);
       const audioCodecId = audioCodecMeta.readUInt32BE(0);
       if (audioCodecId === 0x00000000) {
-        logger.warn(
-          '[ScrcpyServer] Device disabled audio stream (codec_id=0)'
-        );
+        logger.warn('[ScrcpyServer] Device disabled audio stream (codec_id=0)');
       } else if (audioCodecId === 0x00000001) {
         logger.warn(
           '[ScrcpyServer] Device reported audio codec configuration error (codec_id=1)'
