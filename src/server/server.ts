@@ -1,14 +1,16 @@
 import Fastify from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import fastifyWebsocket from '@fastify/websocket';
-import fastifyVite from '@fastify/vite';
+import fastifyStatic from '@fastify/static';
 import path from 'node:path';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   startAutoCleanup as startSessionAutoCleanup,
   stopAutoCleanup as stopSessionAutoCleanup,
 } from '../core/sessions/session-manager.js';
 import { ScrcpyManager } from '../core/scrcpy/scrcpy-manager.js';
-import { initLogger, type LoggerOptions } from '../core/logger/logger.js';
+import { initLogger, getLogger, type LoggerOptions } from '../core/logger/logger.js';
 import { registerHealthHandler } from './handlers/health-handler.js';
 import { registerSessionHandlers } from './handlers/session-handler.js';
 import { registerDeviceHandlers } from './handlers/device-handler.js';
@@ -21,41 +23,27 @@ export type CreateWebServerOptions = {
   logger?: LoggerOptions;
 };
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, '../../');
-const webRoot = path.join(projectRoot, 'web', 'pages', 'home');
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../');
 
 export async function createWebServer(options: CreateWebServerOptions) {
   if (options.logger) {
     initLogger(options.logger);
   }
 
-  const app = Fastify({ logger: false });
-
   const scrcpyManager = new ScrcpyManager();
 
   scrcpyManager.startAutoCleanup();
   startSessionAutoCleanup();
 
+  const app = Fastify({ logger: false });
+
   await app.register(fastifyWebsocket);
-
-  await app.register(fastifyVite, {
-    root: webRoot,
-    dev: false,
-    spa: true,
-  });
-
-  await app.vite.ready();
+  await registerViteFastify(app);
 
   registerHealthHandler(app);
   registerSessionHandlers(app);
   registerDeviceHandlers(app);
   registerScrcpyHandlers(app, scrcpyManager, options);
-
-  app.get('/*', async (_request, reply) => {
-    return reply.html();
-  });
 
   app.addHook('onClose', () => {
     scrcpyManager.stopAll();
@@ -64,4 +52,27 @@ export async function createWebServer(options: CreateWebServerOptions) {
   });
 
   return app;
+}
+
+async function registerViteFastify(app: FastifyInstance): Promise<void> {
+  const webDir = path.join(projectRoot, 'dist', 'web');
+  if (!fs.existsSync(webDir)) {
+    getLogger().warn('Web directory not found, skipping static file serving');
+    return;
+  }
+  await app.register(fastifyStatic, {
+    root: path.join(webDir, 'assets'),
+    prefix: '/assets/',
+    decorateReply: false,
+  });
+
+  app.get('/mirror/*', async (_request, reply) => {
+    const indexHtml = path.join(webDir, 'pages', 'mirror', 'index.html');
+    return reply.type('text/html').send(fs.readFileSync(indexHtml, 'utf8'));
+  });
+
+  app.get('/*', async (_request, reply) => {
+    const indexHtml = path.join(webDir, 'pages', 'home', 'index.html');
+    return reply.type('text/html').send(fs.readFileSync(indexHtml, 'utf8'));
+  });
 }

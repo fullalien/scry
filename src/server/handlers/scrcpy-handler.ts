@@ -5,6 +5,7 @@ import {
   SCRCPY_PATH,
   SCRCPY_STOP_PATH,
   SCRCPY_STREAM_PATH,
+  SCRCPY_DEVICE_STREAM_PATH,
 } from '../path.server.js';
 
 export function registerScrcpyHandlers(
@@ -67,6 +68,105 @@ export function registerScrcpyHandlers(
     }
 
     if (!proc.running) {
+      socket.close(1011, 'Session not running');
+      return;
+    }
+
+    const pendingFrames: Buffer[] = [];
+    let flushed = false;
+
+    const flushPending = () => {
+      if (flushed || socket.readyState !== socket.OPEN) return;
+      flushed = true;
+      for (const frame of pendingFrames) {
+        socket.send(frame);
+      }
+      pendingFrames.length = 0;
+    };
+
+    const onData = (chunk: Buffer) => {
+      if (flushed && socket.readyState === socket.OPEN) {
+        socket.send(chunk);
+      } else {
+        pendingFrames.push(chunk);
+      }
+    };
+
+    const onExit = () => {
+      if (socket.readyState === socket.OPEN) {
+        socket.close(1000, 'scrcpy-server exited');
+      }
+    };
+
+    const onDeviceMessage = (msg: unknown) => {
+      if (socket.readyState !== socket.OPEN) {
+        return;
+      }
+
+      socket.send(
+        JSON.stringify({
+          type: 'device-message',
+          payload:
+            typeof msg === 'object' &&
+            msg !== null &&
+            'type' in (msg as Record<string, unknown>)
+              ? {
+                  ...(msg as Record<string, unknown>),
+                  ...(Buffer.isBuffer((msg as { data?: unknown }).data)
+                    ? {
+                        data: (msg as { data: Buffer }).data.toString('base64'),
+                      }
+                    : {}),
+                }
+              : msg,
+        })
+      );
+    };
+
+    proc.on('data', onData);
+    proc.on('exit', onExit);
+    proc.on('device-message', onDeviceMessage);
+
+    const codecConfigFrame = proc.getLatestCodecConfigFrame();
+    const keyFrame = proc.getLatestKeyFrame();
+
+    if (keyFrame) {
+      pendingFrames.unshift(keyFrame);
+    }
+    if (codecConfigFrame) {
+      pendingFrames.unshift(codecConfigFrame);
+    }
+
+    if (socket.readyState === socket.OPEN) {
+      flushPending();
+    }
+    socket.on('open', flushPending);
+
+    socket.on('message', (msg: Buffer) => {
+      proc.sendControl(msg);
+    });
+
+    socket.on('close', () => {
+      proc.off('data', onData);
+      proc.off('exit', onExit);
+      proc.off('device-message', onDeviceMessage);
+    });
+  });
+
+  app.get(SCRCPY_DEVICE_STREAM_PATH, { websocket: true }, (socket, request) => {
+    const { deviceSerial } = request.params as { deviceSerial: string };
+    const sessions = scrcpyManager.list();
+    const runningSession = sessions.find(
+      s => s.deviceSerial === deviceSerial && s.status === 'running'
+    );
+
+    if (!runningSession) {
+      socket.close(1008, `No running session for device ${deviceSerial}`);
+      return;
+    }
+
+    const proc = scrcpyManager.getProcess(runningSession.id);
+    if (!proc || !proc.running) {
       socket.close(1011, 'Session not running');
       return;
     }

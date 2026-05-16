@@ -1,13 +1,11 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { ScrcpyH264Decoder, type DecoderStats } from '../../../lib/codec/h264.js';
 import {
   HEALTH_PATH,
   SESSIONS_PATH,
   DEVICES_PATH,
   SCRCPY_PATH,
   SCRCPY_STOP_PATH,
-  SCRCPY_STREAM_PATH,
 } from '../../../lib/shared/path.constants.js';
 import './home.css';
 
@@ -53,113 +51,6 @@ type AppData = {
   devicesOk: boolean;
 };
 
-function VideoCanvas({ sessionId }: { sessionId: string }) {
-  const canvasRef = React.useRef<HTMLCanvasElement>(null);
-  const [streamError, setStreamError] = React.useState<string | null>(null);
-  const [stats, setStats] = React.useState<DecoderStats>({
-    packets: 0,
-    invalidType: 0,
-    ignoredNonVideo: 0,
-    configs: 0,
-    frames: 0,
-    keyframes: 0,
-    decoded: 0,
-    waitingForKeyframe: true,
-  });
-
-  React.useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    if (!('VideoDecoder' in window)) {
-      setStreamError(
-        'WebCodecs VideoDecoder not supported (Chrome 94+ / Firefox 130+ / Safari 16.4+ required)'
-      );
-      return;
-    }
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const decoder = new ScrcpyH264Decoder(
-      frame => {
-        // Resize canvas to match the decoded resolution
-        if (
-          canvas.width !== frame.displayWidth ||
-          canvas.height !== frame.displayHeight
-        ) {
-          canvas.width = frame.displayWidth;
-          canvas.height = frame.displayHeight;
-        }
-        ctx.drawImage(frame, 0, 0);
-        frame.close();
-      },
-      err => setStreamError(err.message),
-      setStats
-    );
-
-    const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsPath = SCRCPY_STREAM_PATH.replace(':id', sessionId);
-    const ws = new WebSocket(`${wsProto}//${location.host}${wsPath}`);
-    ws.binaryType = 'arraybuffer';
-
-    ws.onmessage = (e: MessageEvent<ArrayBuffer | string>) => {
-      if (typeof e.data === 'string') {
-        return;
-      }
-      decoder.push(e.data);
-    };
-
-    ws.onerror = () => {
-      console.log('[WS Client] Error');
-      setStreamError('WebSocket connection error');
-    };
-
-    ws.onclose = e => {
-      if (e.code !== 1000 && e.code !== 1005) {
-        setStreamError(`Stream closed: ${e.reason || `code ${e.code}`}`);
-      }
-    };
-
-    return () => {
-      ws.close();
-      decoder.close();
-    };
-  }, [sessionId]);
-
-  return (
-    <div style={{ marginTop: 8 }}>
-      {streamError && (
-        <p style={{ color: '#b91c1c', fontSize: '0.85rem', margin: '4px 0' }}>
-          Stream error: {streamError}
-        </p>
-      )}
-      <canvas
-        ref={canvasRef}
-        style={{
-          width: '100%',
-          maxWidth: 640,
-          display: 'block',
-          background: '#000',
-        }}
-      />
-      <p style={{ color: '#475569', fontSize: '0.8rem', margin: '4px 0' }}>
-        packets {stats.packets} · config {stats.configs} · frames {stats.frames}{' '}
-        · keyframes {stats.keyframes} · decoded {stats.decoded} · waiting
-        keyframe {stats.waitingForKeyframe ? 'yes' : 'no'}
-        {stats.codec ? ` · ${stats.codec}` : ''}
-      </p>
-      <p style={{ color: '#64748b', fontSize: '0.75rem', margin: '4px 0' }}>
-        invalid type {stats.invalidType} · last type{' '}
-        {stats.lastType === undefined
-          ? '-'
-          : `0x${stats.lastType.toString(16).padStart(2, '0')}`}{' '}
-        · ignored non-video {stats.ignoredNonVideo} · {stats.lastHeader ?? '-'}
-      </p>
-    </div>
-  );
-}
-
 async function fetchAppData(): Promise<AppData> {
   const [healthRes, sessionsRes, devicesRes, scrcpyRes] = await Promise.all([
     fetch(HEALTH_PATH),
@@ -185,7 +76,6 @@ async function fetchAppData(): Promise<AppData> {
   return { health, sessions, devices, scrcpySessions, devicesOk };
 }
 
-// Cached outside the component so React StrictMode remounts don't cause a null flash.
 let dataCache: AppData | null = null;
 
 function App() {
@@ -265,10 +155,6 @@ function App() {
     );
   }
 
-  function latestSessionForDevice(serial: string): ScrcpySession | undefined {
-    return scrcpySessions.find(s => s.deviceSerial === serial);
-  }
-
   return (
     <main style={{ fontFamily: 'ui-sans-serif, system-ui', padding: 24 }}>
       <h1>scrcpy-web</h1>
@@ -297,20 +183,29 @@ function App() {
           <ul style={{ listStyle: 'none', padding: 0 }}>
             {devices.map(device => {
               const runningSession = runningSessionForDevice(device.id);
-              const latestSession = latestSessionForDevice(device.id);
               return (
                 <li key={device.id} style={{ marginBottom: 16 }}>
                   <div>
                     <strong>{device.id}</strong> ({device.state}){' '}
                     {runningSession ? (
-                      <button
-                        disabled={Boolean(stopping[runningSession.id])}
-                        onClick={() => void stopScrcpy(runningSession.id)}
-                      >
-                        {stopping[runningSession.id]
-                          ? 'Stopping…'
-                          : 'Stop scrcpy'}
-                      </button>
+                      <>
+                        <button
+                          disabled={Boolean(stopping[runningSession.id])}
+                          onClick={() => void stopScrcpy(runningSession.id)}
+                        >
+                          {stopping[runningSession.id]
+                            ? 'Stopping…'
+                            : 'Stop scrcpy'}
+                        </button>
+                        <a
+                          href={`/mirror/${device.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ marginLeft: 8 }}
+                        >
+                          Open Mirror
+                        </a>
+                      </>
                     ) : (
                       device.state === 'device' && (
                         <button
@@ -322,26 +217,6 @@ function App() {
                       )
                     )}
                   </div>
-                  {runningSession && (
-                    <VideoCanvas sessionId={runningSession.id} />
-                  )}
-                  {latestSession && (
-                    <p
-                      style={{
-                        color: '#64748b',
-                        fontSize: '0.75rem',
-                        margin: '4px 0',
-                      }}
-                    >
-                      session {latestSession.status} · server packets{' '}
-                      {latestSession.stats?.packets ?? 0} · meta{' '}
-                      {latestSession.stats?.sessionMeta ?? 0} · config{' '}
-                      {latestSession.stats?.configs ?? 0} · keyframes{' '}
-                      {latestSession.stats?.keyframes ?? 0} · nal{' '}
-                      {latestSession.stats?.lastNalType ?? '-'} ·{' '}
-                      {latestSession.stats?.lastHeader ?? '-'}
-                    </p>
-                  )}
                   {scrcpySessions
                     .filter(
                       s => s.deviceSerial === device.id && s.status === 'error'
@@ -361,47 +236,6 @@ function App() {
                 </li>
               );
             })}
-          </ul>
-        )}
-      </section>
-
-      <section>
-        <h2>scrcpy Sessions</h2>
-        {scrcpySessions.length === 0 ? (
-          <p>No scrcpy sessions.</p>
-        ) : (
-          <ul>
-            {scrcpySessions.map(s => (
-              <li key={s.id}>
-                {s.deviceSerial} — {s.status} (pid={s.pid}, id={s.id})
-                {s.status === 'running' && (
-                  <>
-                    {' '}
-                    <button
-                      disabled={Boolean(stopping[s.id])}
-                      onClick={() => void stopScrcpy(s.id)}
-                    >
-                      {stopping[s.id] ? 'Stopping…' : 'Stop'}
-                    </button>
-                  </>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section>
-        <h2>Server Sessions</h2>
-        {sessions.length === 0 ? (
-          <p>No active sessions.</p>
-        ) : (
-          <ul>
-            {sessions.map(session => (
-              <li key={session.id}>
-                {session.id} ({session.status}) at {session.host}:{session.port}
-              </li>
-            ))}
           </ul>
         )}
       </section>
