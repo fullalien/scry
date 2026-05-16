@@ -7,6 +7,7 @@ import {
 } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { APP_NAME } from '../constants.js';
 
 export type SessionStatus = 'running' | 'stopped';
 
@@ -38,11 +39,11 @@ export type ListSessionsOptions = {
 
 const STATE_DIR = process.env['SCRCPY_WEB_STATE_DIR']
   ? path.resolve(process.env['SCRCPY_WEB_STATE_DIR'])
-  : path.join(homedir(), '.scrcpy-web');
+  : path.join(homedir(), `.${APP_NAME}`, 'state');
 const STATE_FILE = path.join(STATE_DIR, 'sessions.json');
 const LEGACY_STATE_FILE = path.resolve(
   process.cwd(),
-  '.scrcpy-web',
+  `.${APP_NAME}`,
   'sessions.json'
 );
 const STOPPED_SESSION_TTL_MS = parseInt(

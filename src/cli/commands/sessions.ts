@@ -4,7 +4,7 @@ import { listSessions } from '../../core/sessions/session-manager.js';
 export function registerSessionsCommand(program: Command) {
   program
     .command('sessions')
-    .description('List scrcpy-web sessions')
+    .description('List sessions')
     .option('--all', 'Include stopped sessions', false)
     .option('--running', 'Only show running sessions', false)
     .action(options => {

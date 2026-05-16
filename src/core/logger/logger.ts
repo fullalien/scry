@@ -4,6 +4,8 @@ import { homedir } from 'node:os';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
+const DEFAULT_LOG_FILE = path.join(homedir(), 'scrcpy-web', 'logs', 'app.log');
+
 const LEVEL_PRIORITY: Record<LogLevel, number> = {
   debug: 0,
   info: 1,
@@ -20,42 +22,25 @@ const LEVEL_LABELS: Record<LogLevel, string> = {
 
 export type LoggerOptions = {
   level?: LogLevel;
-  file?: string;
   console?: boolean;
 };
 
-function resolveLogPath(file: string): string {
-  if (file.startsWith('~')) {
-    return path.join(homedir(), file.slice(1));
-  }
-  return path.resolve(file);
-}
-
 export class Logger {
-  private static instance: Logger | null = null;
-  private readonly minLevel: LogLevel;
-  private readonly logFile: string | null;
-  private readonly logToConsole: boolean;
+  private minLevel: LogLevel;
+  private logToConsole: boolean;
 
-  private constructor(options: LoggerOptions = {}) {
+  constructor(options: LoggerOptions = {}) {
     this.minLevel = options.level ?? 'info';
-    this.logFile = options.file ? resolveLogPath(options.file) : null;
     this.logToConsole = options.console ?? false;
   }
 
-  static init(options: LoggerOptions = {}): Logger {
-    if (Logger.instance) {
-      return Logger.instance;
+  configure(options: LoggerOptions): void {
+    if (options.level !== undefined) {
+      this.minLevel = options.level;
     }
-    Logger.instance = new Logger(options);
-    return Logger.instance;
-  }
-
-  static getInstance(): Logger {
-    if (!Logger.instance) {
-      Logger.instance = new Logger({ console: true });
+    if (options.console !== undefined) {
+      this.logToConsole = options.console;
     }
-    return Logger.instance;
   }
 
   private shouldLog(level: LogLevel): boolean {
@@ -92,13 +77,11 @@ export class Logger {
       }
     }
 
-    if (this.logFile) {
-      try {
-        mkdirSync(path.dirname(this.logFile), { recursive: true });
-        appendFileSync(this.logFile, `${line}\n`, 'utf8');
-      } catch {
-        // Silently fail if we can't write to the log file
-      }
+    try {
+      mkdirSync(path.dirname(DEFAULT_LOG_FILE), { recursive: true });
+      appendFileSync(DEFAULT_LOG_FILE, `${line}\n`, 'utf8');
+    } catch {
+      // Silently fail if we can't write to the log file
     }
   }
 
@@ -119,5 +102,5 @@ export class Logger {
   }
 }
 
-export const logger = Logger.getInstance();
+export const logger = new Logger({ console: true });
 export default logger;
