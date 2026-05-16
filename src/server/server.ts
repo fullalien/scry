@@ -25,8 +25,6 @@ const projectRoot = path.resolve(
 export async function createServer(options: ServerOptions) {
   const scrcpyManager = ScrcpyManager.instance;
 
-  scrcpyManager.startAutoCleanup();
-
   const app = Fastify({ logger: false });
 
   await app.register(fastifyWebsocket);
@@ -38,7 +36,6 @@ export async function createServer(options: ServerOptions) {
 
   app.addHook('onClose', () => {
     scrcpyManager.stopAll();
-    scrcpyManager.stopAutoCleanup();
   });
 
   return app;

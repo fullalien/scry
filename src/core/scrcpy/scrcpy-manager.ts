@@ -4,6 +4,7 @@ import {
   type ScrcpyServerOptions,
   type ScrcpyServerStats,
 } from './scrcpy-server.js';
+import { logger } from '../logger/logger.js';
 
 export type ScrcpySessionStatus = 'running' | 'stopped' | 'error';
 
@@ -30,46 +31,12 @@ export type StopScrcpyResult = 'stopped' | 'not-found' | 'already-stopped';
 
 type ScrcpyEntry = { session: ScrcpySession; process: ScrcpyServer };
 
-const STOPPED_SESSION_TTL_MS = parseInt(
-  process.env['STOPPED_SCRCPY_SESSION_TTL_MS'] ?? '3600000',
-  10
-); // Default: 1 hour
-
 export class ScrcpyManager {
   static readonly instance = new ScrcpyManager();
 
   private readonly entries = new Map<string, ScrcpyEntry>();
-  private cleanupIntervalId: NodeJS.Timeout | null = null;
 
   private constructor() {}
-
-  private cleanupStoppedSessions(): void {
-    const now = Date.now();
-    for (const [id, entry] of this.entries.entries()) {
-      if (
-        entry.session.status !== 'running' &&
-        now - entry.session.updatedAt > STOPPED_SESSION_TTL_MS
-      ) {
-        this.entries.delete(id);
-      }
-    }
-  }
-
-  startAutoCleanup(intervalMs = 300000): void {
-    // Default: 5 minutes
-    if (this.cleanupIntervalId) return;
-    this.cleanupStoppedSessions();
-    this.cleanupIntervalId = setInterval(() => {
-      this.cleanupStoppedSessions();
-    }, intervalMs);
-  }
-
-  stopAutoCleanup(): void {
-    if (this.cleanupIntervalId) {
-      clearInterval(this.cleanupIntervalId);
-      this.cleanupIntervalId = null;
-    }
-  }
 
   async start(
     deviceSerial: string,
@@ -118,24 +85,22 @@ export class ScrcpyManager {
 
     this.entries.set(id, { session, process: server });
 
+    logger.info('scrcpy-session started', {
+      sessionId: id,
+      deviceSerial,
+      pid: server.pid,
+    });
+
     server.on('exit', () => {
-      const entry = this.entries.get(id);
-      if (entry) {
-        if (entry.session.status === 'error') {
-          return;
-        }
-        this.entries.set(id, {
-          ...entry,
-          session: {
-            ...entry.session,
-            status: 'stopped',
-            updatedAt: Date.now(),
-          },
-        });
-      }
+      logger.info('scrcpy-server exited', { sessionId: id });
+      this.entries.delete(id);
     });
 
     server.on('error', err => {
+      logger.error('scrcpy-server error', {
+        sessionId: id,
+        error: err instanceof Error ? err.message : String(err),
+      });
       const entry = this.entries.get(id);
       if (entry) {
         this.entries.set(id, {
@@ -158,11 +123,11 @@ export class ScrcpyManager {
     if (!entry) return 'not-found';
     if (entry.session.status !== 'running') return 'already-stopped';
 
-    entry.process.stop();
-    this.entries.set(id, {
-      ...entry,
-      session: { ...entry.session, status: 'stopped', updatedAt: Date.now() },
+    logger.info('stopping scrcpy-session', {
+      sessionId: id,
+      deviceSerial: entry.session.deviceSerial,
     });
+    entry.process.stop();
     return 'stopped';
   }
 
@@ -185,7 +150,6 @@ export class ScrcpyManager {
   }
 
   list(): ScrcpySession[] {
-    this.cleanupStoppedSessions();
     return [...this.entries.values()]
       .map(e => ({
         ...e.session,
