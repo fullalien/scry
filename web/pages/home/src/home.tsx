@@ -7,6 +7,10 @@ import {
   AlertCircle,
   X,
   Square,
+  Hash,
+  Cpu,
+  ScanLine,
+  Proportions,
 } from 'lucide-react';
 import {
   DEVICES_PATH,
@@ -18,6 +22,14 @@ import './home.css';
 type AdbDevice = {
   id: string;
   state: string;
+  model?: string;
+  brand?: string;
+  manufacturer?: string;
+  device?: string;
+  androidVersion?: string;
+  apiLevel?: string;
+  screenRes?: string;
+  screenDensity?: string;
 };
 
 type ScrcpySession = {
@@ -117,7 +129,7 @@ function App() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6 font-sans">
+    <main className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 p-6 font-sans">
       <div className="mx-auto max-w-2xl">
         {error && (
           <div className="mb-5 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
@@ -167,33 +179,87 @@ function App() {
             <ul className="space-y-3">
               {devices.map(device => {
                 const runningSession = runningSessionForDevice(device.id);
+                const isActive = Boolean(runningSession);
+                const isOnline = device.state === 'device';
                 return (
                   <li
                     key={device.id}
-                    className="group rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-all hover:shadow-md hover:border-gray-300"
+                    className={`group overflow-hidden rounded-xl border bg-white shadow-sm transition-all hover:shadow-md ${
+                      isActive ? 'border-emerald-300' : 'border-gray-200 hover:border-gray-300'
+                    }`}
                   >
-                    <div className="flex flex-wrap items-center gap-3">
-                      <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                        <Smartphone
-                          size={18}
-                          className="shrink-0 text-gray-400 group-hover:text-gray-500 transition-colors"
-                        />
-                        <span className="truncate font-medium text-gray-900 text-sm">
-                          {device.id}
-                        </span>
-                        {runningSession && runningSession.viewerCount > 0 && (
-                          <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                            Active
-                          </span>
-                        )}
-                        {device.state !== 'device' && (
-                          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-                            {device.state}
-                          </span>
-                        )}
+                    {/* Active indicator bar */}
+                    <div
+                      className={`h-0.5 transition-all ${
+                        isActive
+                          ? 'bg-linear-to-r from-emerald-400 to-emerald-600'
+                          : 'bg-transparent'
+                      }`}
+                    />
+
+                    <div className="flex items-start gap-3 p-4">
+                      {/* Device icon */}
+                      <div
+                        className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                          isActive
+                            ? 'bg-emerald-50 text-emerald-600'
+                            : 'bg-gray-50 text-gray-400'
+                        }`}
+                      >
+                        <Smartphone size={20} />
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      {/* Info */}
+                      <div className="min-w-0 flex-1">
+                        {/* Name + badges */}
+                        <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                          <span className="font-semibold text-gray-900 text-sm leading-tight">
+                            {device.brand && device.model
+                              ? `${device.brand} ${device.model}`
+                              : device.id}
+                          </span>
+                          {isActive && runningSession!.viewerCount > 0 && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              Live
+                            </span>
+                          )}
+                          {isActive && runningSession!.viewerCount === 0 && (
+                            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
+                              Running
+                            </span>
+                          )}
+                          {!isOnline && (
+                            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200">
+                              {device.state}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Info chips */}
+                        <div className="flex flex-wrap gap-1.5">
+                          <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-0.5 text-xs text-gray-500 ring-1 ring-gray-200 font-mono">
+                            <Hash size={10} className="shrink-0" />
+                            {device.id}
+                          </span>
+                          {device.androidVersion && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-green-50 px-2 py-0.5 text-xs text-green-700 ring-1 ring-green-200">
+                              <Cpu size={10} className="shrink-0" />
+                              Android {device.androidVersion}
+                              {device.apiLevel ? ` · API ${device.apiLevel}` : ''}
+                            </span>
+                          )}
+                          {(device.screenRes ?? device.screenDensity) && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-xs text-blue-700 ring-1 ring-blue-200">
+                              <Proportions size={10} className="shrink-0" />
+                              {[device.screenRes, device.screenDensity ? `${device.screenDensity} dpi` : ''].filter(Boolean).join(' · ')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex shrink-0 items-center gap-2">
                         {runningSession && (
                           <button
                             type="button"
@@ -202,12 +268,10 @@ function App() {
                             onClick={() => void stopScrcpy(runningSession.id)}
                           >
                             <Square size={14} />
-                            {stopping[runningSession.id]
-                              ? 'Stopping…'
-                              : 'Stop'}
+                            {stopping[runningSession.id] ? 'Stopping…' : 'Stop'}
                           </button>
                         )}
-                        {device.state === 'device' && (
+                        {isOnline && (
                           <a
                             href={`/device/${device.id}`}
                             target="_blank"
