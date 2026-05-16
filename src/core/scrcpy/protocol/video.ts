@@ -11,7 +11,7 @@ import {
   NAL_UNIT_TYPE_IDR,
   VIDEO_MSG_TYPE,
   MAX_VIDEO_PAYLOAD_SIZE,
-} from '../scrcpy.constants.js';
+} from './video-constants.js';
 
 // ─── Header parsing ──────────────────────────────────────────────────────────
 
@@ -41,7 +41,10 @@ export function parseMediaHeader(buf: Buffer): ParsedMediaHeader {
  * Returns the first matching `wantedType`, or the first NAL type found if
  * `wantedType` is omitted. Returns `undefined` when no start code is present.
  */
-export function findNalUnitType(data: Buffer, wantedType?: number): number | undefined {
+export function findNalUnitType(
+  data: Buffer,
+  wantedType?: number
+): number | undefined {
   for (let i = 0; i <= data.length - 4; i++) {
     if (data[i] !== 0 || data[i + 1] !== 0) continue;
 
@@ -73,7 +76,10 @@ export function hasIdrNal(data: Buffer): boolean {
 export type VideoFrame = Buffer;
 
 /** Build a WS frame from pts_flags and payload: [VIDEO_MSG_TYPE][pts_flags:8B][data]. */
-export function buildVideoFrame(ptsAndFlags: bigint, payload: Buffer): VideoFrame {
+export function buildVideoFrame(
+  ptsAndFlags: bigint,
+  payload: Buffer
+): VideoFrame {
   const frame = Buffer.allocUnsafe(1 + 8 + payload.length);
   frame[0] = VIDEO_MSG_TYPE;
   frame.writeBigUInt64BE(ptsAndFlags, 1);

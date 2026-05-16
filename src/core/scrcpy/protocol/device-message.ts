@@ -4,7 +4,7 @@
  * Device sends: clipboard text, clipboard ACK, or UHID (HID) output data.
  */
 
-import { DeviceMessageType } from '../scrcpy.constants.js';
+import { DeviceMessageType } from './device-message-constants.js';
 
 export type DeviceMessage =
   | { type: 'clipboard'; text: string }

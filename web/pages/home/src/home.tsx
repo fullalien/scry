@@ -253,10 +253,7 @@ function App() {
                           s.deviceSerial === device.id && s.status === 'error'
                       )
                       .map(s => (
-                        <p
-                          key={s.id}
-                          className="mt-2 text-sm text-red-600"
-                        >
+                        <p key={s.id} className="mt-2 text-sm text-red-600">
                           scrcpy error: {s.error ?? 'unknown error'}
                         </p>
                       ))}

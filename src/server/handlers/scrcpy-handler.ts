@@ -148,11 +148,16 @@ export function registerScrcpyHandlers(
     });
 
     socket.on('error', (err: Error) => {
-      logger.warn('[ScrcpyHandler] Stream socket error', { sessionId: id, error: err.message });
+      logger.warn('[ScrcpyHandler] Stream socket error', {
+        sessionId: id,
+        error: err.message,
+      });
     });
 
     socket.on('close', () => {
-      logger.info('[ScrcpyHandler] Stream client disconnected', { sessionId: id });
+      logger.info('[ScrcpyHandler] Stream client disconnected', {
+        sessionId: id,
+      });
       proc.off('data', onData);
       proc.off('exit', onExit);
       proc.off('device-message', onDeviceMessage);
@@ -252,11 +257,16 @@ export function registerScrcpyHandlers(
     });
 
     socket.on('error', (err: Error) => {
-      logger.warn('[ScrcpyHandler] Stream socket error', { deviceSerial, error: err.message });
+      logger.warn('[ScrcpyHandler] Stream socket error', {
+        deviceSerial,
+        error: err.message,
+      });
     });
 
     socket.on('close', () => {
-      logger.info('[ScrcpyHandler] Device stream client disconnected', { deviceSerial });
+      logger.info('[ScrcpyHandler] Device stream client disconnected', {
+        deviceSerial,
+      });
       proc.off('data', onData);
       proc.off('exit', onExit);
       proc.off('device-message', onDeviceMessage);

@@ -23,17 +23,21 @@ import { logger } from '../logger/logger.js';
 import {
   SCRCPY_FORWARD_PORT,
   DEFAULT_SCID,
+  toScidHex,
+} from './scrcpy-connection.js';
+import {
   DEVICE_NAME_LEN,
   CODEC_ID_LEN,
-  SESSION_HEADER_SIZE,
   CODEC_ID_DISABLED,
   CODEC_ID_CONFIG_ERROR,
   codecIdToText,
-  toScidHex,
-  parseBitRate,
-  type ScrcpyServerOptions,
-  type ScrcpyServerStats,
-} from './scrcpy.constants.js';
+} from './scrcpy-handshake.js';
+import { parseBitRate } from './scrcpy-utils.js';
+import type {
+  ScrcpyServerOptions,
+  ScrcpyServerStats,
+} from './scrcpy-server.types.js';
+import { SESSION_HEADER_SIZE } from './protocol/header.js';
 import { parseSessionHeader, isSessionPacket } from './protocol/session.js';
 import {
   parseMediaHeader,
@@ -42,7 +46,10 @@ import {
   findNalUnitType,
   MAX_VIDEO_PAYLOAD_SIZE,
 } from './protocol/video.js';
-import { parseDeviceMessage, type DeviceMessage } from './protocol/device-message.js';
+import {
+  parseDeviceMessage,
+  type DeviceMessage,
+} from './protocol/device-message.js';
 
 const REMOTE_JAR = '/data/local/tmp/scrcpy-server-v4.0.jar';
 
@@ -140,7 +147,9 @@ async function tcpConnectWithRetry(
       await sleep(delayMs);
     }
   }
-  logger.error(`[ScrcpyServer] TCP connect to port ${port} failed after ${maxAttempts} attempts`);
+  logger.error(
+    `[ScrcpyServer] TCP connect to port ${port} failed after ${maxAttempts} attempts`
+  );
   throw last!;
 }
 
@@ -230,7 +239,9 @@ export class ScrcpyServer extends EventEmitter {
       options.deviceSerial,
       'pkill -f com.genymobile.scrcpy.Server 2>/dev/null; true'
     ).catch(err => {
-      logger.warn('[ScrcpyServer] Failed to kill stale server process', { error: err instanceof Error ? err.message : String(err) });
+      logger.warn('[ScrcpyServer] Failed to kill stale server process', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     });
 
     // 4. Set up port forward (remove any stale forward first)
@@ -259,7 +270,9 @@ export class ScrcpyServer extends EventEmitter {
         'send_dummy_byte=true',
       ]);
     } catch (err) {
-      logger.error('[ScrcpyServer] Failed to spawn shell process', { error: err instanceof Error ? err.message : String(err) });
+      logger.error('[ScrcpyServer] Failed to spawn shell process', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       this.cleanup();
       throw err;
     }
@@ -278,7 +291,10 @@ export class ScrcpyServer extends EventEmitter {
       this.shellExitMessage = `code=${code} signal=${signal}`;
       if (this._running) {
         this._running = false;
-        logger.warn('[ScrcpyServer] Shell process exited unexpectedly', { code, signal });
+        logger.warn('[ScrcpyServer] Shell process exited unexpectedly', {
+          code,
+          signal,
+        });
         this.emit('exit', code, signal);
       }
     });
@@ -289,13 +305,17 @@ export class ScrcpyServer extends EventEmitter {
       await sleep(800);
       await this.connectAndHandshake(socketName);
     } catch (err) {
-      logger.error('[ScrcpyServer] Handshake failed', { error: err instanceof Error ? err.message : String(err) });
+      logger.error('[ScrcpyServer] Handshake failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       this.cleanup();
       throw err;
     }
 
     this._running = true;
-    logger.info('[ScrcpyServer] Server started successfully', { scid: this.scid });
+    logger.info('[ScrcpyServer] Server started successfully', {
+      scid: this.scid,
+    });
 
     // 7. Start streaming packets in the background
     void this.streamPackets();
@@ -402,11 +422,15 @@ export class ScrcpyServer extends EventEmitter {
 
         const parsed = parseMediaHeader(header);
         if (parsed.size > MAX_VIDEO_PAYLOAD_SIZE) {
-          throw new Error(`[ScrcpyServer] Invalid video packet size ${parsed.size}`);
+          throw new Error(
+            `[ScrcpyServer] Invalid video packet size ${parsed.size}`
+          );
         }
 
         const data =
-          parsed.size > 0 ? await this.videoReader.read(parsed.size) : Buffer.alloc(0);
+          parsed.size > 0
+            ? await this.videoReader.read(parsed.size)
+            : Buffer.alloc(0);
 
         const isKeyFrame = parsed.isKeyFrame || hasIdrNal(data);
 
@@ -429,7 +453,10 @@ export class ScrcpyServer extends EventEmitter {
     } catch (err) {
       if (this._running) {
         this._running = false;
-        logger.error('[ScrcpyServer] Streaming failed', { packets: this.stats.packets, error: err instanceof Error ? err.message : String(err) });
+        logger.error('[ScrcpyServer] Streaming failed', {
+          packets: this.stats.packets,
+          error: err instanceof Error ? err.message : String(err),
+        });
         const error =
           err instanceof Error
             ? new Error(
@@ -456,7 +483,9 @@ export class ScrcpyServer extends EventEmitter {
     } catch (err) {
       if (!this._running) return;
       const message = err instanceof Error ? err.message : String(err);
-      logger.warn('[ScrcpyServer] Control reader stopped unexpectedly', { message });
+      logger.warn('[ScrcpyServer] Control reader stopped unexpectedly', {
+        message,
+      });
     }
   }
 
@@ -471,7 +500,10 @@ export class ScrcpyServer extends EventEmitter {
     }
     if (this.deviceSerial) {
       adbForwardRemove(this.deviceSerial, SCRCPY_FORWARD_PORT).catch(err => {
-        logger.warn('[ScrcpyServer] Failed to remove port forward during cleanup', { error: err instanceof Error ? err.message : String(err) });
+        logger.warn(
+          '[ScrcpyServer] Failed to remove port forward during cleanup',
+          { error: err instanceof Error ? err.message : String(err) }
+        );
       });
     }
   }
