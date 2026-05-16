@@ -67,6 +67,8 @@ export class ScrcpyManager {
         videoBitRate: options?.videoBitRate,
       });
     } catch (err) {
+      try { server.stop(); } catch { /* best-effort cleanup */ }
+      logger.error('scrcpy-session start failed', { deviceSerial, error: err instanceof Error ? err.message : String(err) });
       return {
         ok: false,
         error:

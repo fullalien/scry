@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import JSON5 from 'json5';
 import { ConfigSchema, type AppConfig } from './schema.js';
 import { CONFIG_PATH } from './config.constants.js';
+import { logger } from '../logger/logger.js';
 
 export function loadConfig(): AppConfig {
   let fileConfig: Record<string, unknown> = {};
@@ -12,8 +13,11 @@ export function loadConfig(): AppConfig {
         string,
         unknown
       >;
-    } catch {
-      fileConfig = {};
+    } catch (err) {
+      logger.warn(`[Config] Failed to parse config file, using defaults`, {
+        path: CONFIG_PATH,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 

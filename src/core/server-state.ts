@@ -8,6 +8,7 @@ import {
 import path from 'node:path';
 import JSON5 from 'json5';
 import { CONFIG_DIR } from './constants.js';
+import { logger } from './logger/logger.js';
 
 export type ServerState = {
   pid: number;
@@ -24,8 +25,14 @@ export class ServerStateManager {
   private constructor() {}
 
   save(state: ServerState): void {
-    mkdirSync(CONFIG_DIR, { recursive: true });
-    writeFileSync(PID_FILE, JSON.stringify(state, null, 2) + '\n', 'utf8');
+    try {
+      mkdirSync(CONFIG_DIR, { recursive: true });
+      writeFileSync(PID_FILE, JSON.stringify(state, null, 2) + '\n', 'utf8');
+    } catch (err) {
+      logger.warn('[ServerStateManager] Failed to save state file', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   read(): ServerState | null {
@@ -35,7 +42,11 @@ export class ServerStateManager {
     try {
       const raw = readFileSync(PID_FILE, 'utf8');
       return JSON5.parse(raw) as ServerState;
-    } catch {
+    } catch (err) {
+      logger.warn('[ServerStateManager] Corrupted state file, removing', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      this.clear();
       return null;
     }
   }
