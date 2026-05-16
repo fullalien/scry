@@ -259,7 +259,7 @@ export class ScrcpyServer extends EventEmitter {
         ...(this.scid === DEFAULT_SCID ? [] : [`scid=${toScidHex(this.scid)}`]),
         'tunnel_forward=true',
         'video_codec=h264',
-        `max_size=${options.maxSize ?? 1080}`,
+        `max_size=${options.maxSize ?? 0}`,
         `max_fps=${options.maxFps ?? 60}`,
         `video_bit_rate=${parseBitRate(options.videoBitRate)}`,
         `audio=${this.audioEnabled}`,
