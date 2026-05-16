@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import JSON5 from 'json5';
 import { ConfigSchema, type AppConfig } from './schema.js';
 import { CONFIG_PATH } from './config.constants.js';
 
@@ -8,7 +9,7 @@ export function loadConfig(): AppConfig {
 
   if (existsSync(CONFIG_PATH)) {
     try {
-      fileConfig = JSON.parse(readFileSync(CONFIG_PATH, 'utf8')) as Record<
+      fileConfig = JSON5.parse(readFileSync(CONFIG_PATH, 'utf8')) as Record<
         string,
         unknown
       >;

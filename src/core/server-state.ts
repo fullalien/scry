@@ -1,13 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import JSON5 from 'json5';
 import { CONFIG_DIR } from './constants.js';
 
 export type ServerState = {
   pid: number;
   host: string;
   port: number;
-  dev: boolean;
-  startedAt: number;
+  startedAt: string;
 };
 
 const PID_FILE = path.join(CONFIG_DIR, 'server.pid');
@@ -25,7 +25,7 @@ export class ServerStateManager {
     }
     try {
       const raw = readFileSync(PID_FILE, 'utf8');
-      return JSON.parse(raw) as ServerState;
+      return JSON5.parse(raw) as ServerState;
     } catch {
       return null;
     }

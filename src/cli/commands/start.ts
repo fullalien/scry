@@ -57,8 +57,7 @@ export function registerStartCommand(program: Command) {
         pid: child.pid!,
         host,
         port,
-        dev: false,
-        startedAt: Date.now(),
+        startedAt: new Date().toLocaleString(),
       };
       serverStateManager.save(state);
 

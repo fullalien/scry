@@ -52,7 +52,7 @@ export class Logger {
     msg: string,
     context?: Record<string, unknown>
   ): string {
-    const ts = new Date().toISOString();
+    const ts = new Date().toLocaleString();
     const levelLabel = LEVEL_LABELS[level];
     const ctx = context ? ` ${JSON.stringify(context)}` : '';
     return `[${ts}] [${levelLabel}] ${msg}${ctx}`;
