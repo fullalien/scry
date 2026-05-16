@@ -1,6 +1,14 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { ScrcpyH264Decoder, type DecoderStats } from '../../../codec/h264.js';
+import { ScrcpyH264Decoder, type DecoderStats } from '../../../lib/codec/h264.js';
+import {
+  HEALTH_PATH,
+  SESSIONS_PATH,
+  DEVICES_PATH,
+  SCRCPY_PATH,
+  SCRCPY_STOP_PATH,
+  SCRCPY_STREAM_PATH,
+} from '../../../lib/shared/path.constants.js';
 import './home.css';
 
 type HealthResponse = {
@@ -91,9 +99,8 @@ function VideoCanvas({ sessionId }: { sessionId: string }) {
     );
 
     const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(
-      `${wsProto}//${location.host}/ws/stream/${sessionId}`
-    );
+    const wsPath = SCRCPY_STREAM_PATH.replace(':id', sessionId);
+    const ws = new WebSocket(`${wsProto}//${location.host}${wsPath}`);
     ws.binaryType = 'arraybuffer';
 
     ws.onmessage = (e: MessageEvent<ArrayBuffer | string>) => {
@@ -155,10 +162,10 @@ function VideoCanvas({ sessionId }: { sessionId: string }) {
 
 async function fetchAppData(): Promise<AppData> {
   const [healthRes, sessionsRes, devicesRes, scrcpyRes] = await Promise.all([
-    fetch('/api/health'),
-    fetch('/api/sessions'),
-    fetch('/api/devices'),
-    fetch('/api/scrcpy'),
+    fetch(HEALTH_PATH),
+    fetch(SESSIONS_PATH),
+    fetch(DEVICES_PATH),
+    fetch(SCRCPY_PATH),
   ]);
 
   if (!healthRes.ok || !sessionsRes.ok) {
@@ -214,7 +221,7 @@ function App() {
   async function startScrcpy(deviceSerial: string) {
     setStarting(prev => ({ ...prev, [deviceSerial]: true }));
     try {
-      const res = await fetch('/api/scrcpy', {
+      const res = await fetch(SCRCPY_PATH, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceSerial }),
@@ -235,7 +242,8 @@ function App() {
   async function stopScrcpy(sessionId: string) {
     setStopping(prev => ({ ...prev, [sessionId]: true }));
     try {
-      const res = await fetch(`/api/scrcpy/${sessionId}/stop`, {
+      const stopPath = SCRCPY_STOP_PATH.replace(':id', sessionId);
+      const res = await fetch(stopPath, {
         method: 'POST',
       });
       const result = (await res.json()) as { ok: boolean; error?: string };

@@ -1,6 +1,6 @@
 import type { Command } from 'commander';
 import { randomUUID } from 'node:crypto';
-import { createWebServer } from '../../web-server/app.js';
+import { createWebServer } from '../../server/server.js';
 import {
   findRunningSessionByAddress,
   markSessionStopped,
