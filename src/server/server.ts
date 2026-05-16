@@ -17,10 +17,13 @@ export type ServerOptions = {
   scrcpyMaxFps?: number;
 };
 
-const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../');
+const projectRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../../'
+);
 
 export async function createServer(options: ServerOptions) {
-  const scrcpyManager = new ScrcpyManager();
+  const scrcpyManager = ScrcpyManager.instance;
 
   scrcpyManager.startAutoCleanup();
 

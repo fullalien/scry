@@ -26,10 +26,12 @@ export type LoggerOptions = {
 };
 
 export class Logger {
+  static readonly instance = new Logger();
+
   private minLevel: LogLevel;
   private logToConsole: boolean;
 
-  constructor(options: LoggerOptions = {}) {
+  private constructor(options: LoggerOptions = {}) {
     this.minLevel = options.level ?? 'info';
     this.logToConsole = options.console ?? false;
   }
@@ -102,5 +104,5 @@ export class Logger {
   }
 }
 
-export const logger = new Logger({ console: true });
+export const logger = Logger.instance;
 export default logger;

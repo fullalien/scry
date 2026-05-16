@@ -36,8 +36,12 @@ const STOPPED_SESSION_TTL_MS = parseInt(
 ); // Default: 1 hour
 
 export class ScrcpyManager {
+  static readonly instance = new ScrcpyManager();
+
   private readonly entries = new Map<string, ScrcpyEntry>();
   private cleanupIntervalId: NodeJS.Timeout | null = null;
+
+  private constructor() {}
 
   private cleanupStoppedSessions(): void {
     const now = Date.now();
@@ -194,3 +198,6 @@ export class ScrcpyManager {
     return this.entries.get(id)?.process;
   }
 }
+
+export const scrcpyManager = ScrcpyManager.instance;
+export default scrcpyManager;

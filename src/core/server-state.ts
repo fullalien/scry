@@ -1,4 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 import JSON5 from 'json5';
 import { CONFIG_DIR } from './constants.js';
@@ -13,6 +19,9 @@ export type ServerState = {
 const PID_FILE = path.join(CONFIG_DIR, 'server.pid');
 
 export class ServerStateManager {
+  static readonly instance = new ServerStateManager();
+
+  private constructor() {}
 
   save(state: ServerState): void {
     mkdirSync(CONFIG_DIR, { recursive: true });
@@ -52,5 +61,5 @@ export class ServerStateManager {
   }
 }
 
-export const serverStateManager = new ServerStateManager();
+export const serverStateManager = ServerStateManager.instance;
 export default serverStateManager;
