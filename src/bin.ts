@@ -5,12 +5,17 @@ import { registerDevicesCommand } from './cli/commands/devices.js';
 import { registerDoctorCommand } from './cli/commands/doctor.js';
 import { registerSessionsCommand } from './cli/commands/sessions.js';
 import { registerStopCommand } from './cli/commands/stop.js';
-import { registerLogsCommand } from './cli/commands/logs.js';
-import { loadConfig } from './cli/config/load-config.js';
+import { loadConfig } from './core/config/config.js';
+import { Logger } from './core/logger/logger.js';
 
 async function main() {
   const program = new Command();
   const config = loadConfig();
+
+  Logger.init({
+    level: 'info',
+    console: false,
+  });
 
   program.name('scrcpy-web').description('scrcpy-web CLI').version('0.1.0');
 
@@ -19,7 +24,6 @@ async function main() {
   registerDoctorCommand(program, config);
   registerSessionsCommand(program);
   registerStopCommand(program);
-  registerLogsCommand(program, config);
 
   await program.parseAsync(process.argv);
 }

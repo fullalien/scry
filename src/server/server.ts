@@ -10,26 +10,21 @@ import {
   stopAutoCleanup as stopSessionAutoCleanup,
 } from '../core/sessions/session-manager.js';
 import { ScrcpyManager } from '../core/scrcpy/scrcpy-manager.js';
-import { initLogger, getLogger, type LoggerOptions } from '../core/logger/logger.js';
+import { logger } from '../core/logger/logger.js';
 import { registerHealthHandler } from './handlers/health-handler.js';
 import { registerSessionHandlers } from './handlers/session-handler.js';
 import { registerDeviceHandlers } from './handlers/device-handler.js';
 import { registerScrcpyHandlers } from './handlers/scrcpy-handler.js';
 
-export type CreateWebServerOptions = {
+export type ServerOptions = {
   scrcpyVideoBitRate?: number;
   scrcpyMaxSize?: number;
   scrcpyMaxFps?: number;
-  logger?: LoggerOptions;
 };
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../');
 
-export async function createWebServer(options: CreateWebServerOptions) {
-  if (options.logger) {
-    initLogger(options.logger);
-  }
-
+export async function createServer(options: ServerOptions) {
   const scrcpyManager = new ScrcpyManager();
 
   scrcpyManager.startAutoCleanup();
@@ -57,7 +52,7 @@ export async function createWebServer(options: CreateWebServerOptions) {
 async function registerViteFastify(app: FastifyInstance): Promise<void> {
   const webDir = path.join(projectRoot, 'dist', 'web');
   if (!fs.existsSync(webDir)) {
-    getLogger().warn('Web directory not found, skipping static file serving');
+    logger.warn('Web directory not found, skipping static file serving');
     return;
   }
   await app.register(fastifyStatic, {

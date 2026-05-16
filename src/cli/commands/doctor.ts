@@ -2,8 +2,7 @@ import type { Command } from 'commander';
 import { execFile } from 'node:child_process';
 import net from 'node:net';
 import { promisify } from 'node:util';
-import type { AppConfig } from '../config/schema.js';
-import { initLogger, getLogger } from '../../core/logger/logger.js';
+import type { AppConfig } from '../../core/config/schema.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -30,54 +29,35 @@ export function registerDoctorCommand(program: Command, config: AppConfig) {
     .option('--host <host>', 'Host for port check', config.server.host)
     .option('--port <port>', 'Port for port check', String(config.server.port))
     .action(async options => {
-      initLogger({
-        level: config.logs.level,
-        file: config.logs.file,
-      });
-
       const host = options.host as string;
       const port = Number(options.port);
       let adbOk = false;
+      let adbError = '';
       let scrcpyOk = false;
+      let scrcpyError = '';
       let portAvailable = false;
 
       try {
         await execFileAsync(config.adb.path, ['version']);
         adbOk = true;
-      } catch {
-        adbOk = false;
+      } catch (e: any) {
+        adbError = e?.message || e?.stderr || String(e);
       }
 
       try {
         await execFileAsync(config.scrcpy.path, ['--version']);
         scrcpyOk = true;
-      } catch {
-        scrcpyOk = false;
+      } catch (e: any) {
+        scrcpyError = e?.message || e?.stderr || String(e);
       }
 
       portAvailable = await isPortAvailable(host, port);
 
-      getLogger().info(`Node.js: ${process.version}`);
-      getLogger().info(`adb: ${adbOk ? 'ok' : 'missing'}`);
-      getLogger().info(`scrcpy: ${scrcpyOk ? 'ok' : 'missing'}`);
-      getLogger().info(
+      console.log(`Node.js: ${process.version}`);
+      console.log(`adb: ${adbOk ? 'ok' : `missing (${adbError})`}`);
+      console.log(`scrcpy: ${scrcpyOk ? 'ok' : `missing (${scrcpyError})`}`);
+      console.log(
         `port ${host}:${port}: ${portAvailable ? 'available' : 'in use'}`
       );
-      getLogger().info(
-        'WebCodecs: check in browser runtime (feature-detect in client)'
-      );
-
-      getLogger().appendCliLog({
-        level: 'info',
-        command: 'doctor',
-        msg: 'Doctor checks completed',
-        details: {
-          adbOk,
-          scrcpyOk,
-          host,
-          port,
-          portAvailable,
-        },
-      });
     });
 }

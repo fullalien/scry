@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ScrcpyManager } from '../../core/scrcpy/scrcpy-manager.js';
-import type { CreateWebServerOptions } from '../server.js';
+import type { ServerOptions } from '../server.js';
 import {
   SCRCPY_PATH,
   SCRCPY_STOP_PATH,
@@ -11,7 +11,7 @@ import {
 export function registerScrcpyHandlers(
   app: FastifyInstance,
   scrcpyManager: ScrcpyManager,
-  options: CreateWebServerOptions
+  options: ServerOptions
 ) {
   app.get(SCRCPY_PATH, async () => {
     return { sessions: scrcpyManager.list() };

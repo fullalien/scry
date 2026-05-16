@@ -19,7 +19,7 @@ import {
   adbShellSpawn,
 } from '../adb/adb-client.js';
 import { getServerJarPath, SERVER_VERSION } from './server-jar.js';
-import { getLogger } from '../logger/logger.js';
+import { logger } from '../logger/logger.js';
 
 const REMOTE_JAR = '/data/local/tmp/scrcpy-server-v4.0.jar';
 const FORWARD_PORT = 27183;
@@ -295,10 +295,10 @@ export class ScrcpyServer extends EventEmitter {
     })();
 
     if (needsPush) {
-      getLogger().info(`[ScrcpyServer] Pushing jar (${localJarSize} bytes)…`);
+      logger.info(`[ScrcpyServer] Pushing jar (${localJarSize} bytes)…`);
       await adbPush(options.deviceSerial, localJar, REMOTE_JAR);
     } else {
-      getLogger().info(
+      logger.info(
         '[ScrcpyServer] Jar already up-to-date on device, skipping push.'
       );
     }
@@ -407,7 +407,7 @@ export class ScrcpyServer extends EventEmitter {
       );
     }
 
-    getLogger().info(
+    logger.info(
       `[ScrcpyServer] Connected (${socketName}) — device: "${deviceName}", video codec: "${codecIdToText(
         videoCodecId
       )}" ${videoWidth}x${videoHeight}`
@@ -419,15 +419,15 @@ export class ScrcpyServer extends EventEmitter {
       const audioCodecMeta = await audioReader.read(4);
       const audioCodecId = audioCodecMeta.readUInt32BE(0);
       if (audioCodecId === 0x00000000) {
-        getLogger().warn(
+        logger.warn(
           '[ScrcpyServer] Device disabled audio stream (codec_id=0)'
         );
       } else if (audioCodecId === 0x00000001) {
-        getLogger().warn(
+        logger.warn(
           '[ScrcpyServer] Device reported audio codec configuration error (codec_id=1)'
         );
       } else {
-        getLogger().info(
+        logger.info(
           `[ScrcpyServer] Audio codec: "${codecIdToText(audioCodecId)}"`
         );
       }

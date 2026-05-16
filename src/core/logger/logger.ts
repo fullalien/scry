@@ -32,14 +32,30 @@ function resolveLogPath(file: string): string {
 }
 
 export class Logger {
+  private static instance: Logger | null = null;
   private readonly minLevel: LogLevel;
   private readonly logFile: string | null;
   private readonly logToConsole: boolean;
 
-  constructor(options: LoggerOptions = {}) {
+  private constructor(options: LoggerOptions = {}) {
     this.minLevel = options.level ?? 'info';
     this.logFile = options.file ? resolveLogPath(options.file) : null;
     this.logToConsole = options.console ?? false;
+  }
+
+  static init(options: LoggerOptions = {}): Logger {
+    if (Logger.instance) {
+      return Logger.instance;
+    }
+    Logger.instance = new Logger(options);
+    return Logger.instance;
+  }
+
+  static getInstance(): Logger {
+    if (!Logger.instance) {
+      Logger.instance = new Logger({ console: true });
+    }
+    return Logger.instance;
   }
 
   private shouldLog(level: LogLevel): boolean {
@@ -101,47 +117,7 @@ export class Logger {
   error(msg: string, context?: Record<string, unknown>): void {
     this.write('error', msg, context);
   }
-
-  appendCliLog(record: {
-    level: LogLevel;
-    command?: string;
-    session?: string;
-    msg: string;
-    details?: Record<string, unknown>;
-  }): void {
-    if (!this.logFile) return;
-
-    const finalRecord = {
-      ts: new Date().toISOString(),
-      level: record.level,
-      command: record.command,
-      session: record.session,
-      msg: record.msg,
-      details: record.details,
-    };
-
-    try {
-      mkdirSync(path.dirname(this.logFile), { recursive: true });
-      appendFileSync(this.logFile, `${JSON.stringify(finalRecord)}\n`, 'utf8');
-    } catch {
-      // Silently fail if we can't write to the log file
-    }
-  }
 }
 
-let defaultLogger: Logger | null = null;
-
-export function initLogger(options: LoggerOptions = {}): Logger {
-  if (defaultLogger) {
-    return defaultLogger;
-  }
-  defaultLogger = new Logger(options);
-  return defaultLogger;
-}
-
-export function getLogger(): Logger {
-  if (!defaultLogger) {
-    defaultLogger = new Logger({ console: true });
-  }
-  return defaultLogger;
-}
+export const logger = Logger.getInstance();
+export default logger;
