@@ -18,7 +18,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         home: path.resolve(pagesDir, 'home', 'index.html'),
-        mirror: path.resolve(pagesDir, 'mirror', 'index.html'),
+        device: path.resolve(pagesDir, 'device', 'index.html'),
       },
     },
   },

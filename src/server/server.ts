@@ -7,7 +7,6 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { ScrcpyManager } from '../core/scrcpy/scrcpy-manager.js';
 import { logger } from '../core/logger/logger.js';
-import { registerHealthHandler } from './handlers/health-handler.js';
 import { registerDeviceHandlers } from './handlers/device-handler.js';
 import { registerScrcpyHandlers } from './handlers/scrcpy-handler.js';
 
@@ -30,7 +29,6 @@ export async function createServer(options: ServerOptions) {
   await app.register(fastifyWebsocket);
   await registerViteFastify(app);
 
-  registerHealthHandler(app);
   registerDeviceHandlers(app);
   registerScrcpyHandlers(app, scrcpyManager, options);
 
@@ -53,8 +51,8 @@ async function registerViteFastify(app: FastifyInstance): Promise<void> {
     decorateReply: false,
   });
 
-  app.get('/mirror/*', async (_request, reply) => {
-    const indexHtml = path.join(webDir, 'pages', 'mirror', 'index.html');
+  app.get('/device/*', async (_request, reply) => {
+    const indexHtml = path.join(webDir, 'pages', 'device', 'index.html');
     return reply.type('text/html').send(fs.readFileSync(indexHtml, 'utf8'));
   });
 

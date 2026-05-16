@@ -164,20 +164,23 @@ export function registerScrcpyHandlers(
     });
   });
 
-  app.get(SCRCPY_DEVICE_STREAM_PATH, { websocket: true }, (socket, request) => {
+  app.get(SCRCPY_DEVICE_STREAM_PATH, { websocket: true }, async (socket, request) => {
     const { deviceSerial } = request.params as { deviceSerial: string };
-    const sessions = scrcpyManager.list();
-    const runningSession = sessions.find(
-      s => s.deviceSerial === deviceSerial && s.status === 'running'
-    );
 
-    if (!runningSession) {
-      socket.close(1008, `No running session for device ${deviceSerial}`);
+    const result = await scrcpyManager.startForViewer(deviceSerial, {
+      maxSize: options.scrcpyMaxSize,
+      videoBitRate: options.scrcpyVideoBitRate,
+      maxFps: options.scrcpyMaxFps,
+    });
+
+    if (!result.ok) {
+      socket.close(1008, result.error);
       return;
     }
 
-    const proc = scrcpyManager.getProcess(runningSession.id);
+    const proc = scrcpyManager.getProcess(result.session.id);
     if (!proc || !proc.running) {
+      scrcpyManager.removeViewer(deviceSerial);
       socket.close(1011, 'Session not running');
       return;
     }
@@ -266,10 +269,12 @@ export function registerScrcpyHandlers(
     socket.on('close', () => {
       logger.info('[ScrcpyHandler] Device stream client disconnected', {
         deviceSerial,
+        viewerCount: scrcpyManager.getViewerCount(deviceSerial),
       });
       proc.off('data', onData);
       proc.off('exit', onExit);
       proc.off('device-message', onDeviceMessage);
+      scrcpyManager.removeViewer(deviceSerial);
     });
   });
 }

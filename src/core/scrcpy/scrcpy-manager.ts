@@ -17,6 +17,7 @@ export type ScrcpySession = {
   updatedAt: number;
   error?: string;
   stats?: ScrcpyServerStats;
+  viewerCount: number;
 };
 
 export type StartScrcpyOptions = Partial<
@@ -29,12 +30,17 @@ export type StartScrcpyResult =
 
 export type StopScrcpyResult = 'stopped' | 'not-found' | 'already-stopped';
 
-type ScrcpyEntry = { session: ScrcpySession; process: ScrcpyServer };
+type ScrcpyEntry = {
+  session: ScrcpySession;
+  process: ScrcpyServer;
+  viewerCount: number;
+};
 
 export class ScrcpyManager {
   static readonly instance = new ScrcpyManager();
 
   private readonly entries = new Map<string, ScrcpyEntry>();
+  private readonly pendingStarts = new Map<string, Promise<ScrcpySession | null>>();
 
   private constructor() {}
 
@@ -54,6 +60,104 @@ export class ScrcpyManager {
       }
     }
 
+    if (this.pendingStarts.has(deviceSerial)) {
+      return {
+        ok: false,
+        error: `scrcpy start already in progress for device ${deviceSerial}`,
+      };
+    }
+
+    const session = await this.doStart(deviceSerial, options);
+    if (!session) {
+      return {
+        ok: false,
+        error: 'Failed to start scrcpy-server',
+      };
+    }
+
+    return { ok: true, session };
+  }
+
+  async startForViewer(
+    deviceSerial: string,
+    options?: StartScrcpyOptions
+  ): Promise<{ ok: true; session: ScrcpySession } | { ok: false; error: string }> {
+    for (const entry of this.entries.values()) {
+      if (
+        entry.session.deviceSerial === deviceSerial &&
+        entry.session.status === 'running'
+      ) {
+        entry.viewerCount++;
+        logger.info('[ScrcpyManager] Viewer added to existing session', {
+          sessionId: entry.session.id,
+          deviceSerial,
+          viewerCount: entry.viewerCount,
+        });
+        return { ok: true, session: entry.session };
+      }
+    }
+
+    let pending = this.pendingStarts.get(deviceSerial);
+    if (!pending) {
+      pending = this.doStart(deviceSerial, options);
+      this.pendingStarts.set(deviceSerial, pending);
+    }
+
+    const session = await pending;
+    this.pendingStarts.delete(deviceSerial);
+
+    if (!session) {
+      return { ok: false, error: 'Failed to start scrcpy-server' };
+    }
+
+    const entry = this.entries.get(session.id);
+    if (!entry) {
+      return { ok: false, error: 'Session was already removed' };
+    }
+
+    entry.viewerCount++;
+    logger.info('[ScrcpyManager] Viewer added to new session', {
+      sessionId: session.id,
+      deviceSerial,
+      viewerCount: entry.viewerCount,
+    });
+    return { ok: true, session };
+  }
+
+  removeViewer(deviceSerial: string): void {
+    for (const [id, entry] of this.entries) {
+      if (entry.session.deviceSerial === deviceSerial) {
+        entry.viewerCount = Math.max(0, entry.viewerCount - 1);
+        logger.info('[ScrcpyManager] Viewer removed', {
+          sessionId: id,
+          deviceSerial,
+          viewerCount: entry.viewerCount,
+        });
+        if (entry.viewerCount === 0) {
+          logger.info('[ScrcpyManager] Last viewer disconnected, auto-stopping', {
+            sessionId: id,
+            deviceSerial,
+          });
+          entry.process.stop();
+        }
+        return;
+      }
+    }
+  }
+
+  getViewerCount(deviceSerial: string): number {
+    for (const entry of this.entries.values()) {
+      if (entry.session.deviceSerial === deviceSerial) {
+        return entry.viewerCount;
+      }
+    }
+    return 0;
+  }
+
+  private async doStart(
+    deviceSerial: string,
+    options?: StartScrcpyOptions
+  ): Promise<ScrcpySession | null> {
     const id = randomUUID();
     const now = Date.now();
 
@@ -76,11 +180,7 @@ export class ScrcpyManager {
         deviceSerial,
         error: err instanceof Error ? err.message : String(err),
       });
-      return {
-        ok: false,
-        error:
-          err instanceof Error ? err.message : 'Failed to start scrcpy-server',
-      };
+      return null;
     }
 
     const session: ScrcpySession = {
@@ -90,9 +190,10 @@ export class ScrcpyManager {
       status: 'running',
       createdAt: now,
       updatedAt: now,
+      viewerCount: 0,
     };
 
-    this.entries.set(id, { session, process: server });
+    this.entries.set(id, { session, process: server, viewerCount: 0 });
 
     logger.info('scrcpy-session started', {
       sessionId: id,
@@ -124,7 +225,7 @@ export class ScrcpyManager {
       }
     });
 
-    return { ok: true, session };
+    return session;
   }
 
   stop(id: string): StopScrcpyResult {
@@ -162,6 +263,7 @@ export class ScrcpyManager {
     return [...this.entries.values()]
       .map(e => ({
         ...e.session,
+        viewerCount: e.viewerCount,
         stats: e.process.getStats(),
       }))
       .sort((a, b) => b.createdAt - a.createdAt);

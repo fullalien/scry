@@ -2,15 +2,15 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { ScrcpyH264Decoder } from '../../../lib/codec/h264.js';
 import { SCRCPY_DEVICE_STREAM_PATH } from '../../../lib/shared/path.constants.js';
-import './mirror.css';
+import './device.css';
 
 function getDeviceSerialFromUrl(): string | null {
   const path = window.location.pathname;
-  const match = path.match(/^\/mirror\/(.+)$/);
+  const match = path.match(/^\/device\/(.+)$/);
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-function MirrorApp() {
+function DeviceApp() {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const [deviceSerial, setDeviceSerial] = React.useState<string | null>(null);
   const [streamError, setStreamError] = React.useState<string | null>(null);
@@ -88,7 +88,7 @@ function MirrorApp() {
 
   return (
     <main style={{ fontFamily: 'ui-sans-serif, system-ui', padding: 24 }}>
-      <h1>Device Mirror: {deviceSerial || 'Unknown'}</h1>
+      <h1>Device: {deviceSerial || 'Unknown'}</h1>
       {streamError && (
         <p style={{ color: '#b91c1c', fontSize: '0.85rem', margin: '4px 0' }}>
           Stream error: {streamError}
@@ -110,4 +110,4 @@ if (!container) {
   throw new Error('Missing #root');
 }
 
-createRoot(container).render(<MirrorApp />);
+createRoot(container).render(<DeviceApp />);

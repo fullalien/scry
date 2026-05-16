@@ -1,7 +1,5 @@
 export const API_PREFIX = '/api';
 
-export const HEALTH_PATH = `${API_PREFIX}/health`;
-
 export const DEVICES_PATH = `${API_PREFIX}/devices`;
 
 export const SCRCPY_PATH = `${API_PREFIX}/scrcpy`;
