@@ -1,12 +1,13 @@
 import { z } from 'zod';
+import { DEFAULT_HOST, DEFAULT_PORT } from './config.constants.js';
 
 export const ConfigSchema = z.object({
   server: z
     .object({
-      host: z.string().default('127.0.0.1'),
-      port: z.number().int().min(1).max(65535).default(8787),
+      host: z.string().default(DEFAULT_HOST),
+      port: z.number().int().min(1).max(65535).default(DEFAULT_PORT),
     })
-    .default({ host: '127.0.0.1', port: 8787 }),
+    .default({ host: DEFAULT_HOST, port: DEFAULT_PORT }),
   adb: z
     .object({
       path: z.string().default('adb'),

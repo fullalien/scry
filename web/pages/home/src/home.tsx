@@ -2,7 +2,6 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   HEALTH_PATH,
-  SESSIONS_PATH,
   DEVICES_PATH,
   SCRCPY_PATH,
   SCRCPY_STOP_PATH,
@@ -11,14 +10,6 @@ import './home.css';
 
 type HealthResponse = {
   ok: boolean;
-};
-
-type Session = {
-  id: string;
-  host: string;
-  port: number;
-  status: 'running' | 'stopped';
-  createdAt: number;
 };
 
 type AdbDevice = {
@@ -45,26 +36,23 @@ type ScrcpySession = {
 
 type AppData = {
   health: HealthResponse;
-  sessions: Session[];
   devices: AdbDevice[];
   scrcpySessions: ScrcpySession[];
   devicesOk: boolean;
 };
 
 async function fetchAppData(): Promise<AppData> {
-  const [healthRes, sessionsRes, devicesRes, scrcpyRes] = await Promise.all([
+  const [healthRes, devicesRes, scrcpyRes] = await Promise.all([
     fetch(HEALTH_PATH),
-    fetch(SESSIONS_PATH),
     fetch(DEVICES_PATH),
     fetch(SCRCPY_PATH),
   ]);
 
-  if (!healthRes.ok || !sessionsRes.ok) {
+  if (!healthRes.ok) {
     throw new Error('Failed to load server state');
   }
 
   const health = (await healthRes.json()) as HealthResponse;
-  const { sessions } = (await sessionsRes.json()) as { sessions: Session[] };
   const devicesOk = devicesRes.ok;
   const { devices } = devicesOk
     ? ((await devicesRes.json()) as { devices: AdbDevice[] })
@@ -73,7 +61,7 @@ async function fetchAppData(): Promise<AppData> {
     ? ((await scrcpyRes.json()) as { sessions: ScrcpySession[] })
     : { sessions: [] };
 
-  return { health, sessions, devices, scrcpySessions, devicesOk };
+  return { health, devices, scrcpySessions, devicesOk };
 }
 
 let dataCache: AppData | null = null;
@@ -100,9 +88,8 @@ function App() {
     void loadAll();
   }, [loadAll]);
 
-  const { health, sessions, devices, scrcpySessions, devicesOk } = data ?? {
+  const { health, devices, scrcpySessions, devicesOk } = data ?? {
     health: null as HealthResponse | null,
-    sessions: [] as Session[],
     devices: [] as AdbDevice[],
     scrcpySessions: [] as ScrcpySession[],
     devicesOk: false,

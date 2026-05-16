@@ -5,14 +5,9 @@ import fastifyStatic from '@fastify/static';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import {
-  startAutoCleanup as startSessionAutoCleanup,
-  stopAutoCleanup as stopSessionAutoCleanup,
-} from '../core/sessions/session-manager.js';
 import { ScrcpyManager } from '../core/scrcpy/scrcpy-manager.js';
 import { logger } from '../core/logger/logger.js';
 import { registerHealthHandler } from './handlers/health-handler.js';
-import { registerSessionHandlers } from './handlers/session-handler.js';
 import { registerDeviceHandlers } from './handlers/device-handler.js';
 import { registerScrcpyHandlers } from './handlers/scrcpy-handler.js';
 
@@ -28,7 +23,6 @@ export async function createServer(options: ServerOptions) {
   const scrcpyManager = new ScrcpyManager();
 
   scrcpyManager.startAutoCleanup();
-  startSessionAutoCleanup();
 
   const app = Fastify({ logger: false });
 
@@ -36,14 +30,12 @@ export async function createServer(options: ServerOptions) {
   await registerViteFastify(app);
 
   registerHealthHandler(app);
-  registerSessionHandlers(app);
   registerDeviceHandlers(app);
   registerScrcpyHandlers(app, scrcpyManager, options);
 
   app.addHook('onClose', () => {
     scrcpyManager.stopAll();
     scrcpyManager.stopAutoCleanup();
-    stopSessionAutoCleanup();
   });
 
   return app;

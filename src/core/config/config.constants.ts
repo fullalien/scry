@@ -7,3 +7,6 @@ export const CONFIG_PATH = path.join(
   APP_NAME,
   'config.json'
 );
+
+export const DEFAULT_HOST = '127.0.0.1'
+export const DEFAULT_PORT = 8080;
