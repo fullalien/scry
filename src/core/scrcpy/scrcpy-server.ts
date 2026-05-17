@@ -163,6 +163,9 @@ export class ScrcpyServer extends EventEmitter {
   private videoReader!: SocketReader;
   private controlSocket?: net.Socket;
   private controlReader?: SocketReader;
+  private audioSocket?: net.Socket;
+  private audioReader?: SocketReader;
+
   private shellProcess!: ChildProcess;
   private _running = false;
   private controlEnabled = false;
@@ -310,6 +313,7 @@ export class ScrcpyServer extends EventEmitter {
     try {
       // Give the JVM a moment to start before the first connection attempt.
       await sleep(800);
+      logger.info('[ScrcpyServer] Connecting to server socket…', { socketName });
       await this.connectAndHandshake(socketName);
     } catch (err) {
       logger.error('[ScrcpyServer] Handshake failed', {
@@ -326,14 +330,24 @@ export class ScrcpyServer extends EventEmitter {
 
     // 7. Start streaming packets in the background
     void this.streamPackets();
-    if (this.controlEnabled) {
-      void this.readDeviceMessages();
-    }
   }
 
   private async connectAndHandshake(socketName: string): Promise<void> {
     this.videoSocket = await tcpConnectWithRetry(SCRCPY_FORWARD_PORT);
     this.videoReader = new SocketReader(this.videoSocket);
+
+    // should connect control before reading video data
+    if (this.controlEnabled) {
+      logger.info('[ScrcpyServer] Control enabled, connecting to control socket…');
+      void this.connectControlSocket();
+    }
+
+    // should connect audio before reading video data
+    if (this.audioEnabled) {
+      logger.info('[ScrcpyServer] Audio enabled, connecting to audio socket…');
+      this.audioSocket = await tcpConnectWithRetry(SCRCPY_FORWARD_PORT);
+      this.audioReader = new SocketReader(this.audioSocket);
+    }
 
     // 1. Discard the 1-byte dummy (0x00) sent by the server (sendDummyByte=true default).
     await this.readOrThrowShellError(1);
@@ -366,17 +380,9 @@ export class ScrcpyServer extends EventEmitter {
       );
     }
 
-    logger.info(
-      `[ScrcpyServer] Connected (${socketName}) — device: "${deviceName}", video codec: "${codecIdToText(
-        videoCodecId
-      )}" ${parsed.width}x${parsed.height}`
-    );
-
     if (this.audioEnabled) {
-      const audioSocket = await tcpConnectWithRetry(SCRCPY_FORWARD_PORT);
-      const audioReader = new SocketReader(audioSocket);
-      const audioCodecMeta = await audioReader.read(CODEC_ID_LEN);
-      const audioCodecId = audioCodecMeta.readUInt32BE(0);
+      const audioCodecMeta = await this.audioReader?.read(CODEC_ID_LEN);
+      const audioCodecId = audioCodecMeta?.readUInt32BE(0);
       if (audioCodecId === CODEC_ID_DISABLED) {
         logger.warn('[ScrcpyServer] Device disabled audio stream (codec_id=0)');
       } else if (audioCodecId === CODEC_ID_CONFIG_ERROR) {
@@ -385,15 +391,27 @@ export class ScrcpyServer extends EventEmitter {
         );
       } else {
         logger.info(
-          `[ScrcpyServer] Audio codec: "${codecIdToText(audioCodecId)}"`
+          `[ScrcpyServer] Audio codec: "${codecIdToText(audioCodecId ?? 0)}"`
         );
       }
-      audioSocket.destroy();
     }
 
-    if (this.controlEnabled) {
+    logger.info(
+      `[ScrcpyServer] Connected (${socketName}) — device: "${deviceName}", video codec: "${codecIdToText(
+        videoCodecId
+      )}" ${parsed.width}x${parsed.height}`
+    );
+  }
+
+  private async connectControlSocket(): Promise<void> {
+    try {
       this.controlSocket = await tcpConnectWithRetry(SCRCPY_FORWARD_PORT);
       this.controlReader = new SocketReader(this.controlSocket);
+      void this.readDeviceMessages();
+    } catch (err) {
+      logger.warn('[ScrcpyServer] Failed to connect control socket', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -410,7 +428,7 @@ export class ScrcpyServer extends EventEmitter {
         (err instanceof Error ? err.message : String(err));
       throw new Error(
         `[ScrcpyServer] Video socket closed during handshake (reading ${n}B). ` +
-          `Shell exit: ${msg}. Check server logs above.`
+        `Shell exit: ${msg}. Check server logs above.`
       );
     }
   }
@@ -467,11 +485,11 @@ export class ScrcpyServer extends EventEmitter {
         const error =
           err instanceof Error
             ? new Error(
-                `[ScrcpyServer] Stream failed after ${this.stats.packets} packet(s): ${err.message}`
-              )
+              `[ScrcpyServer] Stream failed after ${this.stats.packets} packet(s): ${err.message}`
+            )
             : new Error(
-                `[ScrcpyServer] Stream failed after ${this.stats.packets} packet(s): ${String(err)}`
-              );
+              `[ScrcpyServer] Stream failed after ${this.stats.packets} packet(s): ${String(err)}`
+            );
         this.emit('error', error);
         this.emit('exit', 1, null);
       }

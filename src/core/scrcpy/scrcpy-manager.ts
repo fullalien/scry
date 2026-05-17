@@ -172,11 +172,13 @@ export class ScrcpyManager {
     const server = new ScrcpyServer();
 
     try {
+      logger.info('Starting scrcpy-server', { sessionId: id, deviceSerial });
       await server.start({
         deviceSerial,
         maxSize: options?.maxSize,
         maxFps: options?.maxFps,
         videoBitRate: options?.videoBitRate,
+        control: true,
       });
     } catch (err) {
       try {

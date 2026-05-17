@@ -7,6 +7,18 @@ import {
   SCRCPY_DEVICE_STREAM_PATH,
 } from '../../../lib/shared/path.constants.js';
 import { Spinner } from '../../../components/spinner.js';
+import {
+  encodeInjectTouchEvent,
+  encodeInjectKeycodeEvent,
+  encodeInjectTextEvent,
+  encodeBackOrScreenOn,
+  TouchAction,
+  KeyAction,
+} from '../../../lib/control/control-encoder.js';
+import {
+  keyboardEventToAndroidKeycode,
+  AndroidKeyCode,
+} from '../../../lib/control/android-keycodes.js';
 import './device.css';
 import backIcon from '../../../assets/icon/sysbar_back.svg';
 import homeIcon from '../../../assets/icon/sysbar_home.svg';
@@ -104,6 +116,7 @@ function DeviceApp() {
   const [frameSize, setFrameSize] = React.useState<Size | null>(null);
   const [touchPos, setTouchPos] = React.useState<{ x: number; y: number; pressed: boolean } | null>(null);
   const [retryKey, setRetryKey] = React.useState(0);
+  const wsRef = React.useRef<WebSocket | null>(null);
 
   const displaySize = React.useMemo<Size>(() => {
     const resolution = parseResolution(deviceInfo?.screenRes);
@@ -233,6 +246,13 @@ function DeviceApp() {
     const wsPath = SCRCPY_DEVICE_STREAM_PATH.replace(':deviceSerial', serial);
     const ws = new WebSocket(`${wsProto}//${location.host}${wsPath}`);
     ws.binaryType = 'arraybuffer';
+    wsRef.current = ws;
+
+    console.log('Connecting to stream WebSocket...', { url: ws.url });
+
+    ws.onopen = () => {
+      console.log('WebSocket connected');
+    };
 
     let cancelled = false;
     const timeout = setTimeout(() => {
@@ -244,6 +264,7 @@ function DeviceApp() {
 
     let firstFrame = true;
     ws.onmessage = (e: MessageEvent<ArrayBuffer | string>) => {
+      console.info('Received WebSocket message', { data: e.data instanceof ArrayBuffer ? '[binary data]' : e.data });
       if (typeof e.data === 'string') {
         return;
       }
@@ -275,6 +296,7 @@ function DeviceApp() {
       cancelled = true;
       clearTimeout(timeout);
       ws.close();
+      wsRef.current = null;
       decoder.close();
     };
   }, [retryKey]);
@@ -318,6 +340,44 @@ function DeviceApp() {
     setRetryKey(k => k + 1);
   }, []);
 
+  React.useEffect(() => {
+    if (pageState !== 'streaming') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      const keycode = keyboardEventToAndroidKeycode(e);
+      if (keycode !== undefined) {
+        const msg = encodeInjectKeycodeEvent({ action: KeyAction.DOWN, keycode });
+        ws.send(msg.buffer as ArrayBuffer);
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+        const msg = encodeInjectTextEvent(e.key);
+        ws.send(msg.buffer.slice(msg.byteOffset, msg.byteOffset + msg.byteLength) as ArrayBuffer);
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      const keycode = keyboardEventToAndroidKeycode(e);
+      if (keycode !== undefined) {
+        const msg = encodeInjectKeycodeEvent({ action: KeyAction.UP, keycode });
+        ws.send(msg.buffer as ArrayBuffer);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [pageState]);
+
   const handleScreenshot = React.useCallback(() => {
     const canvas = canvasRef.current;
     const ctx = ctxRef.current;
@@ -339,6 +399,43 @@ function DeviceApp() {
       URL.revokeObjectURL(url);
     }, 'image/png');
   }, [deviceInfo?.model, deviceSerial]);
+
+  const sendTouchAction = React.useCallback(
+    (action: number, clientX: number, clientY: number) => {
+      const ws = wsRef.current;
+      const canvas = canvasRef.current;
+      if (!ws || !canvas || !frameSize || ws.readyState !== WebSocket.OPEN) return;
+
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+
+      const x = Math.round(((clientX - rect.left) / rect.width) * frameSize.width);
+      const y = Math.round(((clientY - rect.top) / rect.height) * frameSize.height);
+
+      const clampedX = Math.max(0, Math.min(x, frameSize.width - 1));
+      const clampedY = Math.max(0, Math.min(y, frameSize.height - 1));
+
+      const msg = encodeInjectTouchEvent({
+        action,
+        x: clampedX,
+        y: clampedY,
+      });
+      ws.send(msg.buffer.slice(msg.byteOffset, msg.byteOffset + msg.byteLength) as ArrayBuffer);
+    },
+    [frameSize]
+  );
+
+  const sendNavigationKey = React.useCallback(
+    (keycode: number) => {
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      const downMsg = encodeInjectKeycodeEvent({ action: KeyAction.DOWN, keycode });
+      const upMsg = encodeInjectKeycodeEvent({ action: KeyAction.UP, keycode });
+      ws.send(downMsg.buffer as ArrayBuffer);
+      ws.send(upMsg.buffer as ArrayBuffer);
+    },
+    []
+  );
 
   return (
     <main className="device-page">
@@ -378,16 +475,17 @@ function DeviceApp() {
               </button>
               <div className="toolbar-divider" />
               <div className="toolbar-nav">
-                <button type="button" className="toolbar-btn" aria-label="Back">
+                <button type="button" className="toolbar-btn" aria-label="Back" onClick={() => sendNavigationKey(AndroidKeyCode.BACK)}>
                   <img src={backIcon} alt="" />
                 </button>
-                <button type="button" className="toolbar-btn" aria-label="Home">
+                <button type="button" className="toolbar-btn" aria-label="Home" onClick={() => sendNavigationKey(AndroidKeyCode.HOME)}>
                   <img src={homeIcon} alt="" />
                 </button>
                 <button
                   type="button"
                   className="toolbar-btn"
                   aria-label="Recent apps"
+                  onClick={() => sendNavigationKey(AndroidKeyCode.APP_SWITCH)}
                 >
                   <img src={recentIcon} alt="" />
                 </button>
@@ -406,12 +504,19 @@ function DeviceApp() {
             }}
             onMouseMove={(e) => {
               setTouchPos(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : { x: e.clientX, y: e.clientY, pressed: false });
+              if (touchPos?.pressed) {
+                sendTouchAction(TouchAction.MOVE, e.clientX, e.clientY);
+              }
             }}
             onMouseDown={(e) => {
               setTouchPos({ x: e.clientX, y: e.clientY, pressed: true });
+              sendTouchAction(TouchAction.DOWN, e.clientX, e.clientY);
             }}
             onMouseUp={() => {
               setTouchPos(prev => prev ? { ...prev, pressed: false } : null);
+              if (touchPos) {
+                sendTouchAction(TouchAction.UP, touchPos.x, touchPos.y);
+              }
             }}
             onMouseLeave={() => setTouchPos(null)}
           >
