@@ -12,17 +12,20 @@ html,
 body,
 #root {
 	width: 100%;
-	height: 100%;
+	min-height: 100vh;
 	margin: 0;
 }
 
-.device-page {
-	width: 100%;
-	min-height: 100%;
+body {
 	background:
 		radial-gradient(circle at 16% 12%, rgb(240 243 247 / 95%), transparent 45%),
 		radial-gradient(circle at 88% 4%, rgb(217 224 235 / 92%), transparent 55%),
 		linear-gradient(165deg, #e3e6ec, #d9dde5 48%, #d3d9e2);
+}
+
+.device-page {
+	width: 100%;
+	min-height: 100vh;
 	font-family: 'SF Pro Display', 'Segoe UI', 'Helvetica Neue', sans-serif;
 }
 
@@ -41,12 +44,10 @@ body,
 	align-items: center;
 	gap: 12px;
 	transform-origin: center center;
-	transition: transform 180ms ease-out;
 }
 
 .device-toolbar {
 	height: 52px;
-	max-width: min(92vw, 860px);
 	border-radius: 999px;
 	background: linear-gradient(180deg, rgb(241 244 248), rgb(226 232 240));
 	color: #13171d;
@@ -92,35 +93,30 @@ body,
 	flex-shrink: 0;
 }
 
-.toolbar-pill {
-	height: 24px;
-	padding: 0 10px;
-	border-radius: 999px;
-	display: inline-flex;
-	align-items: center;
-	font-size: 11px;
-	font-weight: 700;
-	background: rgb(227 231 238);
-	color: rgb(67 72 83);
-	letter-spacing: 0.02em;
-}
-
-.toolbar-pill--active {
-	background: linear-gradient(180deg, #3675ff, #2962e8);
-	color: white;
-	box-shadow: 0 0 0 1px rgb(31 79 201 / 65%) inset;
-}
-
-.toolbar-icon {
-	width: 22px;
-	height: 22px;
+.toolbar-btn {
+	width: 28px;
+	height: 28px;
 	display: inline-grid;
 	place-items: center;
-	border-radius: 999px;
-	font-size: 12px;
-	background: rgb(236 240 245);
-	color: rgb(57 63 74);
-	box-shadow: 0 0 0 1px rgb(0 0 0 / 8%) inset;
+	border-radius: 50%;
+	border: none;
+	cursor: pointer;
+	background: transparent;
+	transition: background 120ms ease;
+}
+
+.toolbar-btn img {
+	width: 20px;
+	height: 20px;
+	filter: brightness(0) saturate(100%) invert(24%) sepia(8%) saturate(400%) hue-rotate(175deg) brightness(95%) contrast(88%);
+}
+
+.toolbar-btn:hover {
+	background: rgb(0 0 0 / 8%);
+}
+
+.toolbar-btn:active {
+	background: rgb(0 0 0 / 14%);
 }
 
 .device-screen {
@@ -172,8 +168,7 @@ body,
 		max-width: 95vw;
 	}
 
-	.toolbar-pill,
-	.toolbar-icon {
+	.toolbar-btn {
 		display: none;
 	}
 }

@@ -6,6 +6,9 @@ import {
   DEVICES_PATH,
   SCRCPY_DEVICE_STREAM_PATH,
 } from '../../../lib/shared/path.constants.js';
+import backIcon from '../../../assets/icon/sysbar_back.svg';
+import homeIcon from '../../../assets/icon/sysbar_home.svg';
+import recentIcon from '../../../assets/icon/sysbar_recent.svg';
 import './device.css';
 
 type AdbDevice = {
@@ -18,14 +21,9 @@ type AdbDevice = {
   screenDensity?: string;
 };
 
-type Size = {
-  width: number;
-  height: number;
-};
+type Size = { width: number; height: number };
 
 const DEFAULT_FALLBACK_DPI = 420;
-const TOP_BAR_HEIGHT = 52;
-const STACK_GAP = 12;
 const BORDER_RADIUS = 18;
 const BORDER_WIDTH = 4;
 
@@ -107,26 +105,22 @@ function DeviceApp() {
     return { width: 360, height: 780 };
   }, [deviceInfo?.screenDensity, deviceInfo?.screenRes, frameSize]);
 
-  const toolbarWidth = React.useMemo(() => {
-    const minWidth = 420;
-    const extra = 120;
-    return Math.max(minWidth, displaySize.width + extra);
-  }, [displaySize.width]);
+  const screenRef = React.useRef<HTMLDivElement>(null);
+  const [screenScale, setScreenScale] = React.useState(1);
 
-  const stackSize = React.useMemo<Size>(() => {
-    return {
-      width: Math.max(displaySize.width, toolbarWidth),
-      height: displaySize.height + TOP_BAR_HEIGHT + STACK_GAP,
-    };
-  }, [displaySize.height, displaySize.width, toolbarWidth]);
-
-  const stackScale = React.useMemo(() => {
+  React.useLayoutEffect(() => {
+    const el = screenRef.current;
+    if (!el) return;
     const horizontalPadding = 40;
     const verticalPadding = 40;
     const availableWidth = Math.max(120, viewport.width - horizontalPadding);
     const availableHeight = Math.max(120, viewport.height - verticalPadding);
-    return Math.min(1, availableWidth / stackSize.width, availableHeight / stackSize.height);
-  }, [stackSize.height, stackSize.width, viewport.height, viewport.width]);
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    if (w > 0 && h > 0) {
+      setScreenScale(Math.min(1, availableWidth / w, availableHeight / h));
+    }
+  }, [viewport.width, viewport.height, displaySize.width, displaySize.height]);
 
   React.useEffect(() => {
     const onResize = () => {
@@ -253,32 +247,28 @@ function DeviceApp() {
   return (
     <main className="device-page">
       <div className="device-stage">
-        <div
-          className="device-stack"
-          style={{
-            width: `${stackSize.width}px`,
-            height: `${stackSize.height}px`,
-            transform: `scale(${stackScale})`,
-          }}
-        >
-          <header
+        <div className="device-stack">
+          <div
             className="device-toolbar"
             role="status"
             aria-live="polite"
-            style={{ width: `${toolbarWidth}px` }}
           >
             <div className="toolbar-left">
               <span className="toolbar-title">{toolbarTitle}</span>
               {toolbarMeta && <span className="toolbar-meta">{toolbarMeta}</span>}
             </div>
             <div className="toolbar-right" aria-hidden="true">
-              <span className="toolbar-pill">H.264</span>
-              <span className="toolbar-pill toolbar-pill--active">MJPEG</span>
-              <span className="toolbar-icon">⌂</span>
-              <span className="toolbar-icon">◍</span>
-              <span className="toolbar-icon">⧉</span>
+              <button type="button" className="toolbar-btn" aria-label="Back">
+                <img src={backIcon} />
+              </button>
+              <button type="button" className="toolbar-btn" aria-label="Home">
+                <img src={homeIcon} />
+              </button>
+              <button type="button" className="toolbar-btn" aria-label="Recent apps">
+                <img src={recentIcon} />
+              </button>
             </div>
-          </header>
+          </div>
 
           <Squircle
             cornerRadius={BORDER_RADIUS}
@@ -294,15 +284,15 @@ function DeviceApp() {
             >
               <div
                 className="device-screen"
+                ref={screenRef}
                 style={{
-                  width: `${displaySize.width}px`,
-                  height: `${displaySize.height}px`,
+                  width: `${displaySize.width * screenScale}px`,
+                  height: `${displaySize.height * screenScale}px`,
                 }}>
                 <canvas ref={canvasRef} className="device-canvas" />
                 {!frameSize && !streamError && (
                   <div className="device-placeholder">Waiting for stream...</div>
                 )}
-                <span>${displaySize.width} ${displaySize.height}</span>
               </div>
             </Squircle>
           </Squircle>
