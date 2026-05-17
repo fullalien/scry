@@ -236,6 +236,27 @@ body {
   background: rgb(230 230 230);
 }
 
+.touch-indicator {
+  position: fixed;
+  width: 20px;
+  height: 20px;
+  margin-left: -10px;
+  margin-top: -10px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 35%);
+  border: 1.5px solid rgb(255 255 255 / 60%);
+  pointer-events: none;
+  box-shadow: 0 0 6px rgb(0 0 0 / 20%);
+  z-index: 999;
+  transition: transform 80ms ease, background 80ms ease, box-shadow 80ms ease;
+}
+
+.touch-indicator[data-pressed] {
+  transform: scale(0.75);
+  background: rgb(255 255 255 / 55%);
+  box-shadow: 0 0 12px rgb(0 0 0 / 30%);
+}
+
 @media (max-width: 900px) {
   .device-stage {
     padding: 14px;

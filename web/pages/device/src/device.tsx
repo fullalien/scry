@@ -102,6 +102,7 @@ function DeviceApp() {
   const [streamError, setStreamError] = React.useState<string | null>(null);
   const [pageState, setPageState] = React.useState<PageState>('loading');
   const [frameSize, setFrameSize] = React.useState<Size | null>(null);
+  const [touchPos, setTouchPos] = React.useState<{ x: number; y: number; pressed: boolean } | null>(null);
   const [retryKey, setRetryKey] = React.useState(0);
 
   const displaySize = React.useMemo<Size>(() => {
@@ -401,7 +402,18 @@ function DeviceApp() {
               height: `${(displaySize.height + SCREEN_BORDER_WIDTH * 2) * screenScale}px`,
               transform: `scale(${screenScale})`,
               transformOrigin: 'top left',
+              cursor: 'none',
             }}
+            onMouseMove={(e) => {
+              setTouchPos(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : { x: e.clientX, y: e.clientY, pressed: false });
+            }}
+            onMouseDown={(e) => {
+              setTouchPos({ x: e.clientX, y: e.clientY, pressed: true });
+            }}
+            onMouseUp={() => {
+              setTouchPos(prev => prev ? { ...prev, pressed: false } : null);
+            }}
+            onMouseLeave={() => setTouchPos(null)}
           >
             <Squircle
               cornerRadius={
@@ -439,6 +451,16 @@ function DeviceApp() {
               </Squircle>
             </Squircle>
           </div>
+          {touchPos && (
+            <div
+              className="touch-indicator"
+              data-pressed={touchPos.pressed || undefined}
+              style={{
+                left: touchPos.x,
+                top: touchPos.y,
+              }}
+            />
+          )}
         </div>
       </div>
     </main>
