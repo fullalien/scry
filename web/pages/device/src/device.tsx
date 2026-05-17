@@ -301,8 +301,8 @@ function DeviceApp() {
           <div
             className="device-screen-wrapper"
             style={{
-              width: `${displaySize.width * screenScale}px`,
-              height: `${displaySize.height * screenScale}px`,
+              width: `${(displaySize.width + SCREEN_BORDER_WIDTH * 2) * screenScale}px`,
+              height: `${(displaySize.height + SCREEN_BORDER_WIDTH * 2) * screenScale}px`,
             }}
           >
             <div
