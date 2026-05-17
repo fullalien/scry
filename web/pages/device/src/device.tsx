@@ -106,8 +106,6 @@ function DeviceApp() {
     return { width: 360, height: 780 };
   }, [deviceInfo?.screenDensity, deviceInfo?.screenRes, frameSize]);
 
-  const screenRef = React.useRef<HTMLDivElement>(null);
-
   const screenScale = React.useMemo(() => {
     const w = displaySize.width + SCREEN_BORDER_WIDTH * 2;
     const h = displaySize.height + SCREEN_BORDER_WIDTH * 2;
@@ -116,7 +114,10 @@ function DeviceApp() {
     const toolbarHeight = 52;
     const gapHeight = 24;
     const availableWidth = Math.max(120, viewport.width - horizontalPadding);
-    const availableHeight = Math.max(120, viewport.height - verticalPadding - toolbarHeight - gapHeight);
+    const availableHeight = Math.max(
+      120,
+      viewport.height - verticalPadding - toolbarHeight - gapHeight
+    );
     return Math.min(1, availableWidth / w, availableHeight / h);
   }, [displaySize, viewport]);
 
@@ -236,12 +237,16 @@ function DeviceApp() {
 
   React.useEffect(() => {
     document.title = toolbarTitle;
-    return () => { document.title = ''; };
+    return () => {
+      document.title = '';
+    };
   }, [toolbarTitle]);
 
   const toolbarMeta = [
     deviceInfo?.androidVersion ? `Android ${deviceInfo.androidVersion}` : null,
-    frameSize ? `${frameSize.width}x${frameSize.height}` : deviceInfo?.screenRes || null,
+    frameSize
+      ? `${frameSize.width}x${frameSize.height}`
+      : deviceInfo?.screenRes || null,
     deviceInfo?.screenDensity ? `${deviceInfo.screenDensity} dpi` : null,
   ]
     .filter(Boolean)
@@ -259,13 +264,12 @@ function DeviceApp() {
     <main className="device-page">
       <div className="device-stage">
         <div className="device-stack">
-          <div
-            className="device-toolbar"
-            role="status"
-            aria-live="polite">
+          <div className="device-toolbar" role="status" aria-live="polite">
             <div className="toolbar-left">
               <span className="toolbar-title">{toolbarTitle}</span>
-              {toolbarMeta && <span className="toolbar-meta">{toolbarMeta}</span>}
+              {toolbarMeta && (
+                <span className="toolbar-meta">{toolbarMeta}</span>
+              )}
             </div>
             <div className="toolbar-right" aria-hidden="true">
               <button type="button" className="toolbar-btn" aria-label="Back">
@@ -274,7 +278,11 @@ function DeviceApp() {
               <button type="button" className="toolbar-btn" aria-label="Home">
                 <img src={homeIcon} />
               </button>
-              <button type="button" className="toolbar-btn" aria-label="Recent apps">
+              <button
+                type="button"
+                className="toolbar-btn"
+                aria-label="Recent apps"
+              >
                 <img src={recentIcon} />
               </button>
             </div>
@@ -289,42 +297,48 @@ function DeviceApp() {
           >
             <div
               style={{
-                width: `${displaySize.width}px`,
-                height: `${displaySize.height}px`,
                 transform: `scale(${screenScale})`,
                 transformOrigin: 'top left',
               }}
             >
-            <Squircle
-              cornerRadius={screenCornerRadius > 0 ? screenCornerRadius + SCREEN_BORDER_WIDTH : 0}
-              cornerSmoothing={0.8}
-              style={{
-                padding: `${SCREEN_BORDER_WIDTH}px`,
-                background: 'black',
-              }}
-            >
               <Squircle
-                cornerRadius={screenCornerRadius}
+                cornerRadius={
+                  screenCornerRadius > 0
+                    ? screenCornerRadius + SCREEN_BORDER_WIDTH
+                    : 0
+                }
                 cornerSmoothing={0.8}
+                style={{
+                  padding: `${SCREEN_BORDER_WIDTH}px`,
+                  background: 'black',
+                }}
               >
-                <div
-                  className="device-screen"
-                  ref={screenRef}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                  }}>
-                  <canvas ref={canvasRef} className="device-canvas" />
-                  {!frameSize && !streamError && (
-                    <div className="device-placeholder">Waiting for stream...</div>
-                  )}
-                </div>
+                <Squircle
+                  cornerRadius={screenCornerRadius}
+                  cornerSmoothing={0.8}
+                >
+                  <div
+                    className="device-screen"
+                    style={{
+                      width: `${displaySize.width}px`,
+                      height: `${displaySize.height}px`,
+                    }}
+                  >
+                    <canvas ref={canvasRef} className="device-canvas" />
+                    {!frameSize && !streamError && (
+                      <div className="device-placeholder">
+                        Waiting for stream...
+                      </div>
+                    )}
+                  </div>
+                </Squircle>
               </Squircle>
-            </Squircle>
             </div>
           </div>
 
-          {streamError && <p className="device-error">Stream error: {streamError}</p>}
+          {streamError && (
+            <p className="device-error">Stream error: {streamError}</p>
+          )}
         </div>
       </div>
     </main>

@@ -47,35 +47,42 @@ async function getDeviceDetails(deviceId: string): Promise<DeviceDetails> {
     const propsQuery = DEVICE_PROPS.map(p => `getprop ${p}`).join('; ');
     const stdout = await adbShell(
       deviceId,
-      `${propsQuery}; echo "---SIZE---"; wm size; echo "---DENSITY---"; wm density; echo "---CORNER---"; dumpsys window | grep -i "mRoundedCorners="`,
+      `${propsQuery}; echo "---SIZE---"; wm size; echo "---DENSITY---"; wm density; echo "---CORNER---"; dumpsys window | grep -i "mRoundedCorners="`
     );
 
     // Strip \r to handle Android's \r\n line endings
     const clean = (s: string) => s.replace(/\r/g, '').trim();
 
-    const [propsRaw, sizeRaw, densityRaw, cornerRaw] = stdout.split(/---SIZE---|---DENSITY---|---CORNER---/);
+    const [propsRaw, sizeRaw, densityRaw, cornerRaw] = stdout.split(
+      /---SIZE---|---DENSITY---|---CORNER---/
+    );
     const propLines = clean(propsRaw ?? '').split('\n');
 
-    const [model, brand, manufacturer, device, androidVersion, apiLevel] = propLines;
+    const [model, brand, manufacturer, device, androidVersion, apiLevel] =
+      propLines;
 
     // wm size  → "Physical size: 1080x2400"
-    const screenRes = clean(sizeRaw ?? '')
-      .replace(/Physical size:\s*/i, '')
-      .replace(/Override size:\s*\S+/i, '')
-      .trim() || undefined;
+    const screenRes =
+      clean(sizeRaw ?? '')
+        .replace(/Physical size:\s*/i, '')
+        .replace(/Override size:\s*\S+/i, '')
+        .trim() || undefined;
 
     // wm density → "Physical density: 440"
-    const screenDensity = clean(densityRaw ?? '')
-      .replace(/Physical density:\s*/i, '')
-      .replace(/Override density:\s*\S+/i, '')
-      .trim() || undefined;
+    const screenDensity =
+      clean(densityRaw ?? '')
+        .replace(/Physical density:\s*/i, '')
+        .replace(/Override density:\s*\S+/i, '')
+        .trim() || undefined;
 
     // corner radius → parse from dumpsys window mRoundedCorners line
     // Format: mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=60, ...}, ...]}
     let screenCornerRadius: number | undefined;
     const cornerText = clean(cornerRaw ?? '');
     if (cornerText) {
-      const radii = [...cornerText.matchAll(/radius=(\d+)/g)].map(m => Number(m[1]));
+      const radii = [...cornerText.matchAll(/radius=(\d+)/g)].map(m =>
+        Number(m[1])
+      );
       const max = radii.length > 0 ? Math.max(...radii) : 0;
       if (max > 0) {
         screenCornerRadius = max;

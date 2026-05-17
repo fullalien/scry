@@ -137,7 +137,7 @@ function App() {
             <span className="flex-1">{error}</span>
             <button
               type="button"
-              className="text-red-400 hover:text-red-600 transition-colors"
+              className="text-red-400 transition-colors hover:text-red-600"
               onClick={() => setError(null)}
               aria-label="Dismiss error"
             >
@@ -185,7 +185,9 @@ function App() {
                   <li
                     key={device.id}
                     className={`group overflow-hidden rounded-xl border bg-white shadow-sm transition-all hover:shadow-md ${
-                      isActive ? 'border-emerald-300' : 'border-gray-200 hover:border-gray-300'
+                      isActive
+                        ? 'border-emerald-300'
+                        : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
                     {/* Active indicator bar */}
@@ -212,15 +214,15 @@ function App() {
                       {/* Info */}
                       <div className="min-w-0 flex-1">
                         {/* Name + badges */}
-                        <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                          <span className="font-semibold text-gray-900 text-sm leading-tight">
+                        <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                          <span className="text-sm leading-tight font-semibold text-gray-900">
                             {device.brand && device.model
                               ? `${device.brand} ${device.model}`
                               : device.id}
                           </span>
                           {isActive && runningSession!.viewerCount > 0 && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
-                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
                               Live
                             </span>
                           )}
@@ -238,7 +240,7 @@ function App() {
 
                         {/* Info chips */}
                         <div className="flex flex-wrap gap-1.5">
-                          <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-0.5 text-xs text-gray-500 ring-1 ring-gray-200 font-mono">
+                          <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-0.5 font-mono text-xs text-gray-500 ring-1 ring-gray-200">
                             <Hash size={10} className="shrink-0" />
                             {device.id}
                           </span>
@@ -246,13 +248,27 @@ function App() {
                             <span className="inline-flex items-center gap-1 rounded-md bg-green-50 px-2 py-0.5 text-xs text-green-700 ring-1 ring-green-200">
                               <Cpu size={10} className="shrink-0" />
                               Android {device.androidVersion}
-                              {device.apiLevel ? ` · API ${device.apiLevel}` : ''}
+                              {device.apiLevel
+                                ? ` · API ${device.apiLevel}`
+                                : ''}
                             </span>
                           )}
-                          {((device.screenRes ?? device.screenDensity ?? device.screenCornerRadius)) && (
+                          {(device.screenRes ??
+                            device.screenDensity ??
+                            device.screenCornerRadius) && (
                             <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-xs text-blue-700 ring-1 ring-blue-200">
                               <Proportions size={10} className="shrink-0" />
-                              {[device.screenRes, device.screenDensity ? `${device.screenDensity} dpi` : '', device.screenCornerRadius ? `R${device.screenCornerRadius}` : ''].filter(Boolean).join(' · ')}
+                              {[
+                                device.screenRes,
+                                device.screenDensity
+                                  ? `${device.screenDensity} dpi`
+                                  : '',
+                                device.screenCornerRadius
+                                  ? `R${device.screenCornerRadius}`
+                                  : '',
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
                             </span>
                           )}
                         </div>

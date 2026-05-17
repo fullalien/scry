@@ -40,7 +40,10 @@ export class ScrcpyManager {
   static readonly instance = new ScrcpyManager();
 
   private readonly entries = new Map<string, ScrcpyEntry>();
-  private readonly pendingStarts = new Map<string, Promise<ScrcpySession | null>>();
+  private readonly pendingStarts = new Map<
+    string,
+    Promise<ScrcpySession | null>
+  >();
 
   private constructor() {}
 
@@ -81,7 +84,9 @@ export class ScrcpyManager {
   async startForViewer(
     deviceSerial: string,
     options?: StartScrcpyOptions
-  ): Promise<{ ok: true; session: ScrcpySession } | { ok: false; error: string }> {
+  ): Promise<
+    { ok: true; session: ScrcpySession } | { ok: false; error: string }
+  > {
     for (const entry of this.entries.values()) {
       if (
         entry.session.deviceSerial === deviceSerial &&
@@ -134,10 +139,13 @@ export class ScrcpyManager {
           viewerCount: entry.viewerCount,
         });
         if (entry.viewerCount === 0) {
-          logger.info('[ScrcpyManager] Last viewer disconnected, auto-stopping', {
-            sessionId: id,
-            deviceSerial,
-          });
+          logger.info(
+            '[ScrcpyManager] Last viewer disconnected, auto-stopping',
+            {
+              sessionId: id,
+              deviceSerial,
+            }
+          );
           entry.process.stop();
         }
         return;

@@ -164,117 +164,123 @@ export function registerScrcpyHandlers(
     });
   });
 
-  app.get(SCRCPY_DEVICE_STREAM_PATH, { websocket: true }, async (socket, request) => {
-    const { deviceSerial } = request.params as { deviceSerial: string };
+  app.get(
+    SCRCPY_DEVICE_STREAM_PATH,
+    { websocket: true },
+    async (socket, request) => {
+      const { deviceSerial } = request.params as { deviceSerial: string };
 
-    const result = await scrcpyManager.startForViewer(deviceSerial, {
-      maxSize: options.scrcpyMaxSize,
-      videoBitRate: options.scrcpyVideoBitRate,
-      maxFps: options.scrcpyMaxFps,
-    });
+      const result = await scrcpyManager.startForViewer(deviceSerial, {
+        maxSize: options.scrcpyMaxSize,
+        videoBitRate: options.scrcpyVideoBitRate,
+        maxFps: options.scrcpyMaxFps,
+      });
 
-    if (!result.ok) {
-      socket.close(1008, result.error);
-      return;
-    }
-
-    const proc = scrcpyManager.getProcess(result.session.id);
-    if (!proc || !proc.running) {
-      scrcpyManager.removeViewer(deviceSerial);
-      socket.close(1011, 'Session not running');
-      return;
-    }
-
-    const pendingFrames: Buffer[] = [];
-    let flushed = false;
-
-    const flushPending = () => {
-      if (flushed || socket.readyState !== socket.OPEN) return;
-      flushed = true;
-      for (const frame of pendingFrames) {
-        socket.send(frame);
-      }
-      pendingFrames.length = 0;
-    };
-
-    const onData = (chunk: Buffer) => {
-      if (flushed && socket.readyState === socket.OPEN) {
-        socket.send(chunk);
-      } else {
-        pendingFrames.push(chunk);
-      }
-    };
-
-    const onExit = () => {
-      if (socket.readyState === socket.OPEN) {
-        socket.close(1000, 'scrcpy-server exited');
-      }
-    };
-
-    const onDeviceMessage = (msg: unknown) => {
-      if (socket.readyState !== socket.OPEN) {
+      if (!result.ok) {
+        socket.close(1008, result.error);
         return;
       }
 
-      socket.send(
-        JSON.stringify({
-          type: 'device-message',
-          payload:
-            typeof msg === 'object' &&
-            msg !== null &&
-            'type' in (msg as Record<string, unknown>)
-              ? {
-                  ...(msg as Record<string, unknown>),
-                  ...(Buffer.isBuffer((msg as { data?: unknown }).data)
-                    ? {
-                        data: (msg as { data: Buffer }).data.toString('base64'),
-                      }
-                    : {}),
-                }
-              : msg,
-        })
-      );
-    };
+      const proc = scrcpyManager.getProcess(result.session.id);
+      if (!proc || !proc.running) {
+        scrcpyManager.removeViewer(deviceSerial);
+        socket.close(1011, 'Session not running');
+        return;
+      }
 
-    proc.on('data', onData);
-    proc.on('exit', onExit);
-    proc.on('device-message', onDeviceMessage);
+      const pendingFrames: Buffer[] = [];
+      let flushed = false;
 
-    const codecConfigFrame = proc.getLatestCodecConfigFrame();
-    const keyFrame = proc.getLatestKeyFrame();
+      const flushPending = () => {
+        if (flushed || socket.readyState !== socket.OPEN) return;
+        flushed = true;
+        for (const frame of pendingFrames) {
+          socket.send(frame);
+        }
+        pendingFrames.length = 0;
+      };
 
-    if (keyFrame) {
-      pendingFrames.unshift(keyFrame);
-    }
-    if (codecConfigFrame) {
-      pendingFrames.unshift(codecConfigFrame);
-    }
+      const onData = (chunk: Buffer) => {
+        if (flushed && socket.readyState === socket.OPEN) {
+          socket.send(chunk);
+        } else {
+          pendingFrames.push(chunk);
+        }
+      };
 
-    if (socket.readyState === socket.OPEN) {
-      flushPending();
-    }
-    socket.on('open', flushPending);
+      const onExit = () => {
+        if (socket.readyState === socket.OPEN) {
+          socket.close(1000, 'scrcpy-server exited');
+        }
+      };
 
-    socket.on('message', (msg: Buffer) => {
-      proc.sendControl(msg);
-    });
+      const onDeviceMessage = (msg: unknown) => {
+        if (socket.readyState !== socket.OPEN) {
+          return;
+        }
 
-    socket.on('error', (err: Error) => {
-      logger.warn('[ScrcpyHandler] Stream socket error', {
-        deviceSerial,
-        error: err.message,
+        socket.send(
+          JSON.stringify({
+            type: 'device-message',
+            payload:
+              typeof msg === 'object' &&
+              msg !== null &&
+              'type' in (msg as Record<string, unknown>)
+                ? {
+                    ...(msg as Record<string, unknown>),
+                    ...(Buffer.isBuffer((msg as { data?: unknown }).data)
+                      ? {
+                          data: (msg as { data: Buffer }).data.toString(
+                            'base64'
+                          ),
+                        }
+                      : {}),
+                  }
+                : msg,
+          })
+        );
+      };
+
+      proc.on('data', onData);
+      proc.on('exit', onExit);
+      proc.on('device-message', onDeviceMessage);
+
+      const codecConfigFrame = proc.getLatestCodecConfigFrame();
+      const keyFrame = proc.getLatestKeyFrame();
+
+      if (keyFrame) {
+        pendingFrames.unshift(keyFrame);
+      }
+      if (codecConfigFrame) {
+        pendingFrames.unshift(codecConfigFrame);
+      }
+
+      if (socket.readyState === socket.OPEN) {
+        flushPending();
+      }
+      socket.on('open', flushPending);
+
+      socket.on('message', (msg: Buffer) => {
+        proc.sendControl(msg);
       });
-    });
 
-    socket.on('close', () => {
-      logger.info('[ScrcpyHandler] Device stream client disconnected', {
-        deviceSerial,
-        viewerCount: scrcpyManager.getViewerCount(deviceSerial),
+      socket.on('error', (err: Error) => {
+        logger.warn('[ScrcpyHandler] Stream socket error', {
+          deviceSerial,
+          error: err.message,
+        });
       });
-      proc.off('data', onData);
-      proc.off('exit', onExit);
-      proc.off('device-message', onDeviceMessage);
-      scrcpyManager.removeViewer(deviceSerial);
-    });
-  });
+
+      socket.on('close', () => {
+        logger.info('[ScrcpyHandler] Device stream client disconnected', {
+          deviceSerial,
+          viewerCount: scrcpyManager.getViewerCount(deviceSerial),
+        });
+        proc.off('data', onData);
+        proc.off('exit', onExit);
+        proc.off('device-message', onDeviceMessage);
+        scrcpyManager.removeViewer(deviceSerial);
+      });
+    }
+  );
 }
