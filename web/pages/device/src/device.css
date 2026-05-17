@@ -102,7 +102,20 @@ body {
 .toolbar-right {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.toolbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 14px;
+  background: rgb(16 20 30 / 12%);
   flex-shrink: 0;
 }
 

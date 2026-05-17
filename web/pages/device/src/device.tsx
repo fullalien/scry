@@ -70,6 +70,7 @@ function getDeviceSerialFromUrl(): string | null {
 
 function DeviceApp() {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
+  const ctxRef = React.useRef<CanvasRenderingContext2D | null>(null);
   const [deviceSerial, setDeviceSerial] = React.useState<string | null>(null);
   const [deviceInfo, setDeviceInfo] = React.useState<AdbDevice | null>(null);
   const [viewport, setViewport] = React.useState<Size>({
@@ -179,6 +180,8 @@ function DeviceApp() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    ctxRef.current = ctx;
+
     const decoder = new ScrcpyH264Decoder(
       frame => {
         if (
@@ -266,6 +269,28 @@ function DeviceApp() {
     return DEFAULT_SCREEN_RADIUS;
   }, [deviceInfo?.screenCornerRadius, deviceInfo?.screenDensity]);
 
+  const handleScreenshot = React.useCallback(() => {
+    const canvas = canvasRef.current;
+    const ctx = ctxRef.current;
+    if (!canvas || !ctx) return;
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const deviceName = deviceInfo?.brand && deviceInfo?.model
+        ? `${deviceInfo.brand}_${deviceInfo.model}`
+        : deviceInfo?.model || deviceSerial || 'device';
+      const safeName = deviceName.replace(/\s+/g, '_');
+      const now = new Date();
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const ts = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}-${pad(now.getMilliseconds()).padStart(3, '0')}Z`;
+      a.download = `${safeName}-${ts}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  }, [deviceInfo?.model, deviceSerial]);
+
   return (
     <main className="device-page">
       {isLoading && (
@@ -282,23 +307,26 @@ function DeviceApp() {
                 <span className="toolbar-meta">{toolbarMeta}</span>
               )}
             </div>
-            <div className="toolbar-right" aria-hidden="true">
-              <button type="button" className="toolbar-btn" aria-label="Screenshot">
-                <img src={screenShotIcon} />
+            <div className="toolbar-right">
+              <button type="button" className="toolbar-btn" aria-label="Screenshot" onClick={handleScreenshot}>
+                <img src={screenShotIcon} alt="" />
               </button>
-              <button type="button" className="toolbar-btn" aria-label="Back">
-                <img src={backIcon} />
-              </button>
-              <button type="button" className="toolbar-btn" aria-label="Home">
-                <img src={homeIcon} />
-              </button>
-              <button
-                type="button"
-                className="toolbar-btn"
-                aria-label="Recent apps"
-              >
-                <img src={recentIcon} />
-              </button>
+              <div className="toolbar-divider" />
+              <div className="toolbar-nav">
+                <button type="button" className="toolbar-btn" aria-label="Back">
+                  <img src={backIcon} alt="" />
+                </button>
+                <button type="button" className="toolbar-btn" aria-label="Home">
+                  <img src={homeIcon} alt="" />
+                </button>
+                <button
+                  type="button"
+                  className="toolbar-btn"
+                  aria-label="Recent apps"
+                >
+                  <img src={recentIcon} alt="" />
+                </button>
+              </div>
             </div>
           </div>
 
