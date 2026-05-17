@@ -9,6 +9,7 @@ import {
 import backIcon from '../../../assets/icon/sysbar_back.svg';
 import homeIcon from '../../../assets/icon/sysbar_home.svg';
 import recentIcon from '../../../assets/icon/sysbar_recent.svg';
+import { Spinner } from '../../../components/spinner.js';
 import './device.css';
 
 type AdbDevice = {
@@ -230,10 +231,14 @@ function DeviceApp() {
     };
   }, []);
 
+  const isLoading = deviceInfo === null && !streamError && deviceSerial !== null;
+
   const toolbarTitle =
-    deviceInfo?.brand && deviceInfo?.model
-      ? `${deviceInfo.brand} ${deviceInfo.model}`
-      : deviceInfo?.model || deviceSerial || 'Unknown device';
+    isLoading
+      ? 'Loading...'
+      : deviceInfo?.brand && deviceInfo?.model
+        ? `${deviceInfo.brand} ${deviceInfo.model}`
+        : deviceInfo?.model || deviceSerial || 'Unknown device';
 
   React.useEffect(() => {
     document.title = toolbarTitle;
@@ -262,7 +267,12 @@ function DeviceApp() {
 
   return (
     <main className="device-page">
-      <div className="device-stage">
+      {isLoading && (
+        <div className="device-loader" role="status" aria-live="polite">
+          <Spinner name="waverows" />
+        </div>
+      )}
+      <div className="device-stage" style={{ opacity: isLoading ? 0 : 1 }}>
         <div className="device-stack">
           <div className="device-toolbar" role="status" aria-live="polite">
             <div className="toolbar-left">
@@ -327,7 +337,10 @@ function DeviceApp() {
                     <canvas ref={canvasRef} className="device-canvas" />
                     {!frameSize && !streamError && (
                       <div className="device-placeholder">
-                        Waiting for stream...
+                        <div className="placeholder-loading">
+                          <Spinner name="rain" />
+                          <span>Waiting for stream...</span>
+                        </div>
                       </div>
                     )}
                   </div>
