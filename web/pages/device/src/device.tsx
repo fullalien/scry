@@ -68,6 +68,23 @@ function getDeviceSerialFromUrl(): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+function formatStreamError(raw: string): { message: string; hint?: string } {
+  if (raw.startsWith('No device serial')) {
+    return { message: 'No device serial in URL' };
+  }
+  if (raw.startsWith('WebCodecs')) {
+    return { message: 'Browser doesn\'t support screen mirroring', hint: 'Use Chrome 94+, Firefox 130+, or Safari 16.4+' };
+  }
+  if (raw.startsWith('WebSocket')) {
+    return { message: 'Cannot connect to device', hint: 'Server may be unreachable or device is offline' };
+  }
+  if (raw.startsWith('Stream closed')) {
+    const detail = raw.replace('Stream closed: ', '');
+    return { message: 'Stream disconnected', hint: detail };
+  }
+  return { message: 'Video decoding error', hint: raw };
+}
+
 function DeviceApp() {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const ctxRef = React.useRef<CanvasRenderingContext2D | null>(null);
@@ -79,6 +96,7 @@ function DeviceApp() {
   });
   const [frameSize, setFrameSize] = React.useState<Size | null>(null);
   const [streamError, setStreamError] = React.useState<string | null>(null);
+  const [retryKey, setRetryKey] = React.useState(0);
 
   const displaySize = React.useMemo<Size>(() => {
     const resolution = parseResolution(deviceInfo?.screenRes);
@@ -233,7 +251,7 @@ function DeviceApp() {
       ws.close();
       decoder.close();
     };
-  }, []);
+  }, [retryKey]);
 
   const isLoading = deviceInfo === null && !streamError && deviceSerial !== null;
 
@@ -269,6 +287,12 @@ function DeviceApp() {
     return DEFAULT_SCREEN_RADIUS;
   }, [deviceInfo?.screenCornerRadius, deviceInfo?.screenDensity]);
 
+  const handleRetry = React.useCallback(() => {
+    setStreamError(null);
+    setFrameSize(null);
+    setRetryKey(k => k + 1);
+  }, []);
+
   const handleScreenshot = React.useCallback(() => {
     const canvas = canvasRef.current;
     const ctx = ctxRef.current;
@@ -300,6 +324,22 @@ function DeviceApp() {
       )}
       <div className="device-stage" style={{ opacity: isLoading ? 0 : 1 }}>
         <div className="device-stack">
+          {streamError && (() => {
+            const error = formatStreamError(streamError);
+            return (
+              <div className="device-error-float" role="alert" aria-live="assertive">
+                <span>{error.message}</span>
+                <button
+                  type="button"
+                  className="device-error-retry"
+                  aria-label="Retry"
+                  onClick={handleRetry}
+                >
+                  Retry
+                </button>
+              </div>
+            );
+          })()}
           <div className="device-toolbar" role="status" aria-live="polite">
             <div className="toolbar-left">
               <span className="toolbar-title">{toolbarTitle}</span>
@@ -376,10 +416,6 @@ function DeviceApp() {
             </Squircle>
           </div>
         </div>
-
-        {streamError && (
-          <p className="device-error">Stream error: {streamError}</p>
-        )}
       </div>
     </main>
   );
