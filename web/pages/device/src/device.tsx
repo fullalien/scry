@@ -82,8 +82,13 @@ function formatStreamError(raw: string): { message: string; hint?: string } {
     const detail = raw.replace('Stream closed: ', '');
     return { message: 'Stream disconnected', hint: detail };
   }
+  if (raw.startsWith('Stream connection timed out')) {
+    return { message: 'Stream connection timed out', hint: 'Server may be busy or device is offline. Try again.' };
+  }
   return { message: 'Video decoding error', hint: raw };
 }
+
+type PageState = 'loading' | 'streaming' | 'error';
 
 function DeviceApp() {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
@@ -94,8 +99,9 @@ function DeviceApp() {
     width: window.innerWidth,
     height: window.innerHeight,
   });
-  const [frameSize, setFrameSize] = React.useState<Size | null>(null);
   const [streamError, setStreamError] = React.useState<string | null>(null);
+  const [pageState, setPageState] = React.useState<PageState>('loading');
+  const [frameSize, setFrameSize] = React.useState<Size | null>(null);
   const [retryKey, setRetryKey] = React.useState(0);
 
   const displaySize = React.useMemo<Size>(() => {
@@ -227,36 +233,53 @@ function DeviceApp() {
     const ws = new WebSocket(`${wsProto}//${location.host}${wsPath}`);
     ws.binaryType = 'arraybuffer';
 
+    let cancelled = false;
+    const timeout = setTimeout(() => {
+      if (!cancelled) {
+        setStreamError('Stream connection timed out');
+        setPageState('error');
+      }
+    }, 10000);
+
+    let firstFrame = true;
     ws.onmessage = (e: MessageEvent<ArrayBuffer | string>) => {
       if (typeof e.data === 'string') {
         return;
+      }
+      if (firstFrame) {
+        firstFrame = false;
+        clearTimeout(timeout);
+        setPageState('streaming');
       }
       decoder.push(e.data);
     };
 
     ws.onerror = () => {
-      console.error('[Mirror] WebSocket connection error');
+      if (cancelled) return;
+      console.error('WebSocket connection error');
       setStreamError('WebSocket connection error');
+      setPageState('error');
     };
 
     ws.onclose = e => {
-      if (e.code !== 1000 && e.code !== 1005) {
-        const errorMsg = `Stream closed: ${e.reason || `code ${e.code}`}`;
-        console.error('[Mirror]', errorMsg);
-        setStreamError(errorMsg);
-      }
+      if (cancelled) return;
+      clearTimeout(timeout);
+      const errorMsg = `Stream closed: ${e.reason || `code ${e.code}`}`;
+      console.error(errorMsg);
+      setStreamError(errorMsg);
+      setPageState('error');
     };
 
     return () => {
+      cancelled = true;
+      clearTimeout(timeout);
       ws.close();
       decoder.close();
     };
   }, [retryKey]);
 
-  const isLoading = deviceInfo === null && !streamError && deviceSerial !== null;
-
   const toolbarTitle =
-    isLoading
+    pageState === 'loading' && deviceInfo === null
       ? 'Loading...'
       : deviceInfo?.brand && deviceInfo?.model
         ? `${deviceInfo.brand} ${deviceInfo.model}`
@@ -290,6 +313,7 @@ function DeviceApp() {
   const handleRetry = React.useCallback(() => {
     setStreamError(null);
     setFrameSize(null);
+    setPageState('loading');
     setRetryKey(k => k + 1);
   }, []);
 
@@ -317,15 +341,15 @@ function DeviceApp() {
 
   return (
     <main className="device-page">
-      {isLoading && (
+      {pageState === 'loading' && (
         <div className="device-loader" role="status" aria-live="polite">
           <Spinner name="waverows" />
         </div>
       )}
-      <div className="device-stage" style={{ opacity: isLoading ? 0 : 1 }}>
+      <div className="device-stage" style={{ opacity: pageState === 'loading' ? 0 : 1 }}>
         <div className="device-stack">
-          {streamError && (() => {
-            const error = formatStreamError(streamError);
+          {pageState === 'error' && (() => {
+            const error = formatStreamError(streamError!);
             return (
               <div className="device-error-float" role="alert" aria-live="assertive">
                 <span>{error.message}</span>
@@ -403,7 +427,7 @@ function DeviceApp() {
                   }}
                 >
                   <canvas ref={canvasRef} className="device-canvas" />
-                  {!frameSize && !streamError && (
+                  {pageState === 'loading' && (
                     <div className="device-placeholder">
                       <div className="placeholder-loading">
                         <Spinner name="rain" />
