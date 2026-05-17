@@ -121,8 +121,7 @@ body {
 .toolbar-btn img {
   width: 20px;
   height: 20px;
-  filter: brightness(0) saturate(100%) invert(24%) sepia(8%) saturate(400%)
-    hue-rotate(175deg) brightness(95%) contrast(88%);
+  filter: brightness(0) saturate(100%) invert(24%) sepia(8%) saturate(400%) hue-rotate(175deg) brightness(95%) contrast(88%);
 }
 
 .toolbar-btn:hover {
@@ -133,13 +132,15 @@ body {
   background: rgb(0 0 0 / 14%);
 }
 
+.device-screen-wrapper {
+  filter:
+    drop-shadow(0 1px 6px rgb(0 0 0 / 15%)) drop-shadow(0 4px 12px rgb(0 0 0 / 20%)) drop-shadow(0 8px 20px rgb(0 0 0 / 12%));
+}
+
 .device-screen {
   position: relative;
   overflow: hidden;
   background: black;
-  /* box-shadow is set via inline style so the ring width can be
-	   compensated for the parent transform: scale(), keeping it
-	   visually uniform on all four sides at any zoom level. */
 }
 
 .device-canvas {

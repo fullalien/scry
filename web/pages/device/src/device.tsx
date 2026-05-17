@@ -303,56 +303,51 @@ function DeviceApp() {
             style={{
               width: `${(displaySize.width + SCREEN_BORDER_WIDTH * 2) * screenScale}px`,
               height: `${(displaySize.height + SCREEN_BORDER_WIDTH * 2) * screenScale}px`,
+              transform: `scale(${screenScale})`,
+              transformOrigin: 'top left',
             }}
           >
-            <div
+            <Squircle
+              cornerRadius={
+                screenCornerRadius > 0
+                  ? screenCornerRadius + SCREEN_BORDER_WIDTH
+                  : 0
+              }
+              cornerSmoothing={0.8}
               style={{
-                transform: `scale(${screenScale})`,
-                transformOrigin: 'top left',
+                padding: `${SCREEN_BORDER_WIDTH}px`,
+                background: 'black',
               }}
             >
               <Squircle
-                cornerRadius={
-                  screenCornerRadius > 0
-                    ? screenCornerRadius + SCREEN_BORDER_WIDTH
-                    : 0
-                }
+                cornerRadius={screenCornerRadius}
                 cornerSmoothing={0.8}
-                style={{
-                  padding: `${SCREEN_BORDER_WIDTH}px`,
-                  background: 'black',
-                }}
               >
-                <Squircle
-                  cornerRadius={screenCornerRadius}
-                  cornerSmoothing={0.8}
+                <div
+                  className="device-screen"
+                  style={{
+                    width: `${displaySize.width}px`,
+                    height: `${displaySize.height}px`,
+                  }}
                 >
-                  <div
-                    className="device-screen"
-                    style={{
-                      width: `${displaySize.width}px`,
-                      height: `${displaySize.height}px`,
-                    }}
-                  >
-                    <canvas ref={canvasRef} className="device-canvas" />
-                    {!frameSize && !streamError && (
-                      <div className="device-placeholder">
-                        <div className="placeholder-loading">
-                          <Spinner name="rain" />
-                          <span>Waiting for stream...</span>
-                        </div>
+                  <canvas ref={canvasRef} className="device-canvas" />
+                  {!frameSize && !streamError && (
+                    <div className="device-placeholder">
+                      <div className="placeholder-loading">
+                        <Spinner name="rain" />
+                        <span>Waiting for stream...</span>
                       </div>
-                    )}
-                  </div>
-                </Squircle>
+                    </div>
+                  )}
+                </div>
               </Squircle>
-            </div>
+            </Squircle>
           </div>
-
-          {streamError && (
-            <p className="device-error">Stream error: {streamError}</p>
-          )}
         </div>
+
+        {streamError && (
+          <p className="device-error">Stream error: {streamError}</p>
+        )}
       </div>
     </main>
   );
