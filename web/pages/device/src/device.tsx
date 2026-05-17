@@ -19,13 +19,14 @@ type AdbDevice = {
   androidVersion?: string;
   screenRes?: string;
   screenDensity?: string;
+  screenCornerRadius?: number;
 };
 
 type Size = { width: number; height: number };
 
 const DEFAULT_FALLBACK_DPI = 420;
-const BORDER_RADIUS = 18;
-const BORDER_WIDTH = 4;
+const DEFAULT_SCREEN_RADIUS = 0;
+const SCREEN_BORDER_WIDTH = 4;
 
 function parseResolution(value?: string): Size | null {
   if (!value) return null;
@@ -244,6 +245,14 @@ function DeviceApp() {
     .filter(Boolean)
     .join('  •  ');
 
+  const screenCornerRadius = React.useMemo(() => {
+    const density = parseDensity(deviceInfo?.screenDensity);
+    if (deviceInfo?.screenCornerRadius && density) {
+      return toCssInchPixels(deviceInfo.screenCornerRadius, density);
+    }
+    return DEFAULT_SCREEN_RADIUS;
+  }, [deviceInfo?.screenCornerRadius, deviceInfo?.screenDensity]);
+
   return (
     <main className="device-page">
       <div className="device-stage">
@@ -271,15 +280,15 @@ function DeviceApp() {
           </div>
 
           <Squircle
-            cornerRadius={BORDER_RADIUS}
+            cornerRadius={screenCornerRadius > 0 ? screenCornerRadius + SCREEN_BORDER_WIDTH : 0}
             cornerSmoothing={0.8}
             style={{
-              padding: `${BORDER_WIDTH}px`,
+              padding: `${SCREEN_BORDER_WIDTH}px`,
               background: 'black',
             }}
           >
             <Squircle
-              cornerRadius={BORDER_RADIUS - BORDER_WIDTH}
+              cornerRadius={screenCornerRadius}
               cornerSmoothing={0.8}
             >
               <div

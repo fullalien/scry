@@ -9,7 +9,6 @@ import {
   Square,
   Hash,
   Cpu,
-  ScanLine,
   Proportions,
 } from 'lucide-react';
 import {
@@ -30,6 +29,7 @@ type AdbDevice = {
   apiLevel?: string;
   screenRes?: string;
   screenDensity?: string;
+  screenCornerRadius?: number;
 };
 
 type ScrcpySession = {
@@ -249,10 +249,10 @@ function App() {
                               {device.apiLevel ? ` · API ${device.apiLevel}` : ''}
                             </span>
                           )}
-                          {(device.screenRes ?? device.screenDensity) && (
+                          {((device.screenRes ?? device.screenDensity ?? device.screenCornerRadius)) && (
                             <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-xs text-blue-700 ring-1 ring-blue-200">
                               <Proportions size={10} className="shrink-0" />
-                              {[device.screenRes, device.screenDensity ? `${device.screenDensity} dpi` : ''].filter(Boolean).join(' · ')}
+                              {[device.screenRes, device.screenDensity ? `${device.screenDensity} dpi` : '', device.screenCornerRadius ? `R${device.screenCornerRadius}` : ''].filter(Boolean).join(' · ')}
                             </span>
                           )}
                         </div>
