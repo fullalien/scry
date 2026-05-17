@@ -6,11 +6,12 @@ import {
   DEVICES_PATH,
   SCRCPY_DEVICE_STREAM_PATH,
 } from '../../../lib/shared/path.constants.js';
+import { Spinner } from '../../../components/spinner.js';
+import './device.css';
 import backIcon from '../../../assets/icon/sysbar_back.svg';
 import homeIcon from '../../../assets/icon/sysbar_home.svg';
 import recentIcon from '../../../assets/icon/sysbar_recent.svg';
-import { Spinner } from '../../../components/spinner.js';
-import './device.css';
+import screenShotIcon from '../../../assets/icon/ic_screenshot.svg';
 
 type AdbDevice = {
   id: string;
@@ -282,6 +283,9 @@ function DeviceApp() {
               )}
             </div>
             <div className="toolbar-right" aria-hidden="true">
+              <button type="button" className="toolbar-btn" aria-label="Screenshot">
+                <img src={screenShotIcon} />
+              </button>
               <button type="button" className="toolbar-btn" aria-label="Back">
                 <img src={backIcon} />
               </button>
