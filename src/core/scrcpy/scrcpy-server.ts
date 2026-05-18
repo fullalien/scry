@@ -91,7 +91,9 @@ class SocketReader {
   }
 
   private drain(): void {
-    while (this.pending.length > 0 && this.buf.length >= this.pending[0]!.n) {
+    while (this.pending.length > 0) {
+      const req = this.pending[0];
+      if (!req || this.buf.length < req.n) break;
       const { n, resolve } = this.pending.shift()!;
       resolve(this.buf.subarray(0, n));
       this.buf = this.buf.subarray(n);

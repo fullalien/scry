@@ -32,6 +32,12 @@ export function registerScrcpyHandlers(
       return { ok: false, error: 'deviceSerial is required' };
     }
 
+    // Validate deviceSerial format to prevent command injection
+    if (typeof deviceSerial !== 'string' || !/^[a-zA-Z0-9._:-]+$/.test(deviceSerial)) {
+      reply.code(400);
+      return { ok: false, error: 'Invalid deviceSerial format' };
+    }
+
     const result = await scrcpyManager.start(deviceSerial, {
       maxSize: body?.maxSize ?? options.scrcpyMaxSize,
       videoBitRate: body?.videoBitRate ?? options.scrcpyVideoBitRate,
@@ -75,6 +81,7 @@ export function registerScrcpyHandlers(
 
     const pendingFrames: Buffer[] = [];
     let flushed = false;
+    const MAX_PENDING_FRAMES = 30;
 
     const flushPending = () => {
       if (flushed || socket.readyState !== socket.OPEN) return;
@@ -89,6 +96,9 @@ export function registerScrcpyHandlers(
       if (flushed && socket.readyState === socket.OPEN) {
         socket.send(chunk);
       } else {
+        if (pendingFrames.length >= MAX_PENDING_FRAMES) {
+          pendingFrames.shift();
+        }
         pendingFrames.push(chunk);
       }
     };
@@ -170,6 +180,12 @@ export function registerScrcpyHandlers(
     async (socket, request) => {
       const { deviceSerial } = request.params as { deviceSerial: string };
 
+      // Validate deviceSerial format to prevent command injection
+      if (!deviceSerial || typeof deviceSerial !== 'string' || !/^[a-zA-Z0-9._:-]+$/.test(deviceSerial)) {
+        socket.close(1008, 'Invalid deviceSerial format');
+        return;
+      }
+
       const result = await scrcpyManager.startForViewer(deviceSerial, {
         maxSize: options.scrcpyMaxSize,
         videoBitRate: options.scrcpyVideoBitRate,
@@ -190,6 +206,7 @@ export function registerScrcpyHandlers(
 
       const pendingFrames: Buffer[] = [];
       let flushed = false;
+      const MAX_PENDING_FRAMES = 30;
 
       const flushPending = () => {
         if (flushed || socket.readyState !== socket.OPEN) return;
@@ -204,6 +221,9 @@ export function registerScrcpyHandlers(
         if (flushed && socket.readyState === socket.OPEN) {
           socket.send(chunk);
         } else {
+          if (pendingFrames.length >= MAX_PENDING_FRAMES) {
+            pendingFrames.shift();
+          }
           pendingFrames.push(chunk);
         }
       };

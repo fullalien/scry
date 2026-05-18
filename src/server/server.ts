@@ -51,13 +51,17 @@ async function registerViteFastify(app: FastifyInstance): Promise<void> {
     decorateReply: false,
   });
 
+  // Cache HTML files to avoid repeated reads and potential resource leaks
+  const deviceHtmlPath = path.join(webDir, 'pages', 'device', 'index.html');
+  const homeHtmlPath = path.join(webDir, 'pages', 'home', 'index.html');
+  const deviceHtml = fs.readFileSync(deviceHtmlPath, 'utf8');
+  const homeHtml = fs.readFileSync(homeHtmlPath, 'utf8');
+
   app.get('/device/*', async (_request, reply) => {
-    const indexHtml = path.join(webDir, 'pages', 'device', 'index.html');
-    return reply.type('text/html').send(fs.readFileSync(indexHtml, 'utf8'));
+    return reply.type('text/html').send(deviceHtml);
   });
 
   app.get('/*', async (_request, reply) => {
-    const indexHtml = path.join(webDir, 'pages', 'home', 'index.html');
-    return reply.type('text/html').send(fs.readFileSync(indexHtml, 'utf8'));
+    return reply.type('text/html').send(homeHtml);
   });
 }
