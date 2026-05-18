@@ -17,3 +17,17 @@ export {
   type ParsedMediaHeader,
   type VideoFrame,
 } from './video.js';
+export {
+  ControlMessageType,
+  TouchAction,
+  KeyAction,
+  encodeInjectKeycodeEvent,
+  encodeInjectTextEvent,
+  encodeInjectTouchEvent,
+  encodeBackOrScreenOn,
+} from './control-encoder.js';
+export {
+  AndroidKeyCode,
+  KEY_TO_ANDROID_KEYCODE,
+  keyboardEventToAndroidKeycode,
+} from './android-keycodes.js';

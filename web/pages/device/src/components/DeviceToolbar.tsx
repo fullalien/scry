@@ -2,8 +2,8 @@ import React from 'react';
 import {
   encodeInjectKeycodeEvent,
   KeyAction,
-} from '../../../../lib/control/control-encoder';
-import { AndroidKeyCode } from '../../../../lib/control/android-keycodes';
+} from '@shared/scrcpy';
+import { AndroidKeyCode } from '@shared/scrcpy';
 import backIcon from '../../../../assets/icon/sysbar_back.svg';
 import homeIcon from '../../../../assets/icon/sysbar_home.svg';
 import recentIcon from '../../../../assets/icon/sysbar_recent.svg';

@@ -1,5 +1,5 @@
 import { useCallback, useState, useRef, RefObject } from 'react';
-import { encodeInjectTouchEvent, TouchAction } from '../../../../lib/control/control-encoder';
+import { encodeInjectTouchEvent, TouchAction } from '@shared/scrcpy';
 import type { Size } from '../utils/resolution';
 
 export function useTouchInput(

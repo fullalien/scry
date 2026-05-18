@@ -3,10 +3,8 @@ import {
   encodeInjectKeycodeEvent,
   encodeInjectTextEvent,
   KeyAction,
-} from '../../../../lib/control/control-encoder';
-import {
   keyboardEventToAndroidKeycode,
-} from '../../../../lib/control/android-keycodes';
+} from '@shared/scrcpy';
 import type { PageState } from './useDeviceStream';
 
 export function useKeyboardInput(
