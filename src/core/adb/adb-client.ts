@@ -1,5 +1,6 @@
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
+import { logger } from '../logger/logger.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -43,6 +44,11 @@ const deviceDetailsCache = new Map<string, DeviceDetails>();
 
 async function getDeviceDetails(deviceId: string): Promise<DeviceDetails> {
   try {
+    // Validate deviceId format to prevent command injection
+    if (!/^[a-zA-Z0-9._:-]+$/.test(deviceId)) {
+      throw new Error('Invalid device ID format');
+    }
+
     // Query all props + wm size/density in one shell invocation
     const propsQuery = DEVICE_PROPS.map(p => `getprop ${p}`).join('; ');
     const stdout = await adbShell(
@@ -165,13 +171,21 @@ export async function adbForwardRemove(
   deviceId: string,
   localPort: number
 ): Promise<void> {
-  await execFileAsync('adb', [
-    '-s',
-    deviceId,
-    'forward',
-    '--remove',
-    `tcp:${localPort}`,
-  ]).catch(() => {});
+  try {
+    await execFileAsync('adb', [
+      '-s',
+      deviceId,
+      'forward',
+      '--remove',
+      `tcp:${localPort}`,
+    ]);
+  } catch (err) {
+    logger.debug('[adb] Failed to remove forward', {
+      deviceId,
+      port: localPort,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 /** Run `adb shell <cmd>` and return stdout (rejects on non-zero exit). */
