@@ -1,0 +1,4 @@
+export const DEFAULT_FALLBACK_DPI = 420;
+export const DEFAULT_SCREEN_RADIUS = 0;
+export const SCREEN_BORDER_WIDTH = 4;
+export const STREAM_TIMEOUT_MS = 10000;

@@ -1,122 +1,48 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { Squircle } from '@squircle-js/react';
-import { ScrcpyH264Decoder } from '../../../lib/codec/h264.js';
 import {
-  DEVICES_PATH,
-  SCRCPY_DEVICE_STREAM_PATH,
-} from '../../../lib/shared/path.constants.js';
+  parseResolution,
+  parseDensity,
+  toCssInchPixels,
+  alignOrientation,
+  type Size,
+} from './utils/resolution.js';
+import { getDeviceSerialFromUrl } from './utils/url.js';
+import { DEFAULT_FALLBACK_DPI, DEFAULT_SCREEN_RADIUS, SCREEN_BORDER_WIDTH } from './constants.js';
+import { useViewport } from './hooks/useViewport.js';
+import { useDeviceInfo } from './hooks/useDeviceInfo.js';
+import { useDeviceStream, type PageState } from './hooks/useDeviceStream.js';
+import { useTouchInput } from './hooks/useTouchInput.js';
+import { useKeyboardInput } from './hooks/useKeyboardInput.js';
+import { DeviceToolbar } from './components/DeviceToolbar.js';
+import { DeviceScreen } from './components/DeviceScreen.js';
+import { DeviceErrorOverlay } from './components/DeviceErrorOverlay.js';
+import { TouchIndicator } from './components/TouchIndicator.js';
 import { Spinner } from '../../../components/spinner.js';
-import {
-  encodeInjectTouchEvent,
-  encodeInjectKeycodeEvent,
-  encodeInjectTextEvent,
-  encodeBackOrScreenOn,
-  TouchAction,
-  KeyAction,
-} from '../../../lib/control/control-encoder.js';
-import {
-  keyboardEventToAndroidKeycode,
-  AndroidKeyCode,
-} from '../../../lib/control/android-keycodes.js';
 import './device.css';
-import backIcon from '../../../assets/icon/sysbar_back.svg';
-import homeIcon from '../../../assets/icon/sysbar_home.svg';
-import recentIcon from '../../../assets/icon/sysbar_recent.svg';
-import screenShotIcon from '../../../assets/icon/ic_screenshot.svg';
-
-type AdbDevice = {
-  id: string;
-  state: string;
-  model?: string;
-  brand?: string;
-  androidVersion?: string;
-  screenRes?: string;
-  screenDensity?: string;
-  screenCornerRadius?: number;
-};
-
-type Size = { width: number; height: number };
-
-const DEFAULT_FALLBACK_DPI = 420;
-const DEFAULT_SCREEN_RADIUS = 0;
-const SCREEN_BORDER_WIDTH = 4;
-
-function parseResolution(value?: string): Size | null {
-  if (!value) return null;
-  const match = value.match(/(\d+)\s*x\s*(\d+)/i);
-  if (!match) return null;
-  const width = Number(match[1]);
-  const height = Number(match[2]);
-  if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
-  if (width <= 0 || height <= 0) return null;
-  return { width, height };
-}
-
-function parseDensity(value?: string): number | null {
-  if (!value) return null;
-  const match = value.match(/(\d+(?:\.\d+)?)/);
-  if (!match) return null;
-  const density = Number(match[1]);
-  if (!Number.isFinite(density) || density <= 0) return null;
-  return density;
-}
-
-function toCssInchPixels(px: number, density: number): number {
-  return (px * 96) / density;
-}
-
-function alignOrientation(target: Size, reference: Size): Size {
-  const sameOrientation =
-    (target.width >= target.height && reference.width >= reference.height) ||
-    (target.width < target.height && reference.width < reference.height);
-  if (sameOrientation) return target;
-  return { width: target.height, height: target.width };
-}
-
-function getDeviceSerialFromUrl(): string | null {
-  const path = window.location.pathname;
-  const match = path.match(/^\/device\/(.+)$/);
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-function formatStreamError(raw: string): { message: string; hint?: string } {
-  if (raw.startsWith('No device serial')) {
-    return { message: 'No device serial in URL' };
-  }
-  if (raw.startsWith('WebCodecs')) {
-    return { message: 'Browser doesn\'t support screen mirroring', hint: 'Use Chrome 94+, Firefox 130+, or Safari 16.4+' };
-  }
-  if (raw.startsWith('WebSocket')) {
-    return { message: 'Cannot connect to device', hint: 'Server may be unreachable or device is offline' };
-  }
-  if (raw.startsWith('Stream closed')) {
-    const detail = raw.replace('Stream closed: ', '');
-    return { message: 'Stream disconnected', hint: detail };
-  }
-  if (raw.startsWith('Stream connection timed out')) {
-    return { message: 'Stream connection timed out', hint: 'Server may be busy or device is offline. Try again.' };
-  }
-  return { message: 'Video decoding error', hint: raw };
-}
-
-type PageState = 'loading' | 'streaming' | 'error';
 
 function DeviceApp() {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const ctxRef = React.useRef<CanvasRenderingContext2D | null>(null);
-  const [deviceSerial, setDeviceSerial] = React.useState<string | null>(null);
-  const [deviceInfo, setDeviceInfo] = React.useState<AdbDevice | null>(null);
-  const [viewport, setViewport] = React.useState<Size>({
-    width: window.innerWidth,
-    height: window.innerHeight,
-  });
-  const [streamError, setStreamError] = React.useState<string | null>(null);
-  const [pageState, setPageState] = React.useState<PageState>('loading');
-  const [frameSize, setFrameSize] = React.useState<Size | null>(null);
-  const [touchPos, setTouchPos] = React.useState<{ x: number; y: number; pressed: boolean } | null>(null);
+
+  React.useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      ctxRef.current = canvas.getContext('2d');
+    }
+  }, []);
+  const viewport = useViewport();
+  const deviceSerial = getDeviceSerialFromUrl();
+  const deviceInfo = useDeviceInfo(deviceSerial);
   const [retryKey, setRetryKey] = React.useState(0);
-  const wsRef = React.useRef<WebSocket | null>(null);
+  const { pageState, streamError, frameSize, wsRef, handleRetry } = useDeviceStream(deviceSerial, canvasRef, retryKey);
+  const { touchPos, handleMouseMove, handleMouseDown, handleMouseUp, handleMouseLeave } = useTouchInput(wsRef, canvasRef, frameSize);
+  useKeyboardInput(wsRef, pageState);
+
+  const handleRetryWithReset = React.useCallback(() => {
+    handleRetry();
+    setRetryKey(k => k + 1);
+  }, [handleRetry]);
 
   const displaySize = React.useMemo<Size>(() => {
     const resolution = parseResolution(deviceInfo?.screenRes);
@@ -129,8 +55,6 @@ function DeviceApp() {
       };
       if (frameSize) {
         const aligned = alignOrientation(physical, frameSize);
-        // Use frameSize aspect ratio to avoid black bars when scrcpy
-        // outputs a slightly different resolution than the device reports.
         const frameAspect = frameSize.height / frameSize.width;
         return { width: aligned.width, height: aligned.width * frameAspect };
       }
@@ -162,169 +86,6 @@ function DeviceApp() {
     return Math.min(1, availableWidth / w, availableHeight / h);
   }, [displaySize, viewport]);
 
-  React.useEffect(() => {
-    const onResize = () => {
-      setViewport({ width: window.innerWidth, height: window.innerHeight });
-    };
-    window.addEventListener('resize', onResize);
-    return () => {
-      window.removeEventListener('resize', onResize);
-    };
-  }, []);
-
-  React.useEffect(() => {
-    if (!deviceSerial) return;
-
-    let cancelled = false;
-    const loadDeviceInfo = async () => {
-      try {
-        const response = await fetch(DEVICES_PATH);
-        if (!response.ok) return;
-        const payload = (await response.json()) as { devices?: AdbDevice[] };
-        if (cancelled) return;
-        const found = payload.devices?.find(d => d.id === deviceSerial) ?? null;
-        setDeviceInfo(found);
-      } catch {
-        // Keep UI usable even when device metadata cannot be loaded.
-      }
-    };
-
-    void loadDeviceInfo();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [deviceSerial]);
-
-  React.useEffect(() => {
-    const serial = getDeviceSerialFromUrl();
-    setDeviceSerial(serial);
-
-    if (!serial) {
-      setStreamError('No device serial provided in URL');
-      return;
-    }
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    if (!('VideoDecoder' in window)) {
-      setStreamError(
-        'WebCodecs VideoDecoder not supported (Chrome 94+ / Firefox 130+ / Safari 16.4+ required)'
-      );
-      return;
-    }
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctxRef.current = ctx;
-
-    const decoder = new ScrcpyH264Decoder(
-      frame => {
-        if (
-          canvas.width !== frame.displayWidth ||
-          canvas.height !== frame.displayHeight
-        ) {
-          canvas.width = frame.displayWidth;
-          canvas.height = frame.displayHeight;
-          setFrameSize({
-            width: frame.displayWidth,
-            height: frame.displayHeight,
-          });
-        }
-        ctx.drawImage(frame, 0, 0);
-        frame.close();
-      },
-      err => {
-        console.error('[Mirror] Decoder error:', err.message);
-        setStreamError(err.message);
-      }
-    );
-
-    const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsPath = SCRCPY_DEVICE_STREAM_PATH.replace(':deviceSerial', serial);
-    const ws = new WebSocket(`${wsProto}//${location.host}${wsPath}`);
-    ws.binaryType = 'arraybuffer';
-    wsRef.current = ws;
-
-    console.log('Connecting to stream WebSocket...', { url: ws.url });
-
-    ws.onopen = () => {
-      console.log('WebSocket connected');
-    };
-
-    let cancelled = false;
-    const timeout = setTimeout(() => {
-      if (!cancelled) {
-        setStreamError('Stream connection timed out');
-        setPageState('error');
-      }
-    }, 10000);
-
-    let firstFrame = true;
-    ws.onmessage = (e: MessageEvent<ArrayBuffer | string>) => {
-      console.info('Received WebSocket message', { data: e.data instanceof ArrayBuffer ? '[binary data]' : e.data });
-      if (typeof e.data === 'string') {
-        return;
-      }
-      if (firstFrame) {
-        firstFrame = false;
-        clearTimeout(timeout);
-        setPageState('streaming');
-      }
-      decoder.push(e.data);
-    };
-
-    ws.onerror = () => {
-      if (cancelled) return;
-      console.error('WebSocket connection error');
-      setStreamError('WebSocket connection error');
-      setPageState('error');
-    };
-
-    ws.onclose = e => {
-      if (cancelled) return;
-      clearTimeout(timeout);
-      const errorMsg = `Stream closed: ${e.reason || `code ${e.code}`}`;
-      console.error(errorMsg);
-      setStreamError(errorMsg);
-      setPageState('error');
-    };
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timeout);
-      ws.close();
-      wsRef.current = null;
-      decoder.close();
-    };
-  }, [retryKey]);
-
-  const toolbarTitle =
-    pageState === 'loading' && deviceInfo === null
-      ? 'Loading...'
-      : deviceInfo?.brand && deviceInfo?.model
-        ? `${deviceInfo.brand} ${deviceInfo.model}`
-        : deviceInfo?.model || deviceSerial || 'Unknown device';
-
-  React.useEffect(() => {
-    document.title = toolbarTitle;
-    return () => {
-      document.title = '';
-    };
-  }, [toolbarTitle]);
-
-  const toolbarMeta = [
-    deviceInfo?.androidVersion ? `Android ${deviceInfo.androidVersion}` : null,
-    frameSize
-      ? `${frameSize.width}x${frameSize.height}`
-      : deviceInfo?.screenRes || null,
-    deviceInfo?.screenDensity ? `${deviceInfo.screenDensity} dpi` : null,
-  ]
-    .filter(Boolean)
-    .join('  •  ');
-
   const screenCornerRadius = React.useMemo(() => {
     const density = parseDensity(deviceInfo?.screenDensity);
     if (deviceInfo?.screenCornerRadius && density) {
@@ -332,51 +93,6 @@ function DeviceApp() {
     }
     return DEFAULT_SCREEN_RADIUS;
   }, [deviceInfo?.screenCornerRadius, deviceInfo?.screenDensity]);
-
-  const handleRetry = React.useCallback(() => {
-    setStreamError(null);
-    setFrameSize(null);
-    setPageState('loading');
-    setRetryKey(k => k + 1);
-  }, []);
-
-  React.useEffect(() => {
-    if (pageState !== 'streaming') return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const ws = wsRef.current;
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
-      const keycode = keyboardEventToAndroidKeycode(e);
-      if (keycode !== undefined) {
-        const msg = encodeInjectKeycodeEvent({ action: KeyAction.DOWN, keycode });
-        ws.send(msg.buffer as ArrayBuffer);
-      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
-        const msg = encodeInjectTextEvent(e.key);
-        ws.send(msg.buffer.slice(msg.byteOffset, msg.byteOffset + msg.byteLength) as ArrayBuffer);
-      }
-    };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      const ws = wsRef.current;
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
-      const keycode = keyboardEventToAndroidKeycode(e);
-      if (keycode !== undefined) {
-        const msg = encodeInjectKeycodeEvent({ action: KeyAction.UP, keycode });
-        ws.send(msg.buffer as ArrayBuffer);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, [pageState]);
 
   const handleScreenshot = React.useCallback(() => {
     const canvas = canvasRef.current;
@@ -400,42 +116,18 @@ function DeviceApp() {
     }, 'image/png');
   }, [deviceInfo?.model, deviceSerial]);
 
-  const sendTouchAction = React.useCallback(
-    (action: number, clientX: number, clientY: number) => {
-      const ws = wsRef.current;
-      const canvas = canvasRef.current;
-      if (!ws || !canvas || !frameSize || ws.readyState !== WebSocket.OPEN) return;
-
-      const rect = canvas.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return;
-
-      const x = Math.round(((clientX - rect.left) / rect.width) * frameSize.width);
-      const y = Math.round(((clientY - rect.top) / rect.height) * frameSize.height);
-
-      const clampedX = Math.max(0, Math.min(x, frameSize.width - 1));
-      const clampedY = Math.max(0, Math.min(y, frameSize.height - 1));
-
-      const msg = encodeInjectTouchEvent({
-        action,
-        x: clampedX,
-        y: clampedY,
-      });
-      ws.send(msg.buffer.slice(msg.byteOffset, msg.byteOffset + msg.byteLength) as ArrayBuffer);
-    },
-    [frameSize]
-  );
-
-  const sendNavigationKey = React.useCallback(
-    (keycode: number) => {
-      const ws = wsRef.current;
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      const downMsg = encodeInjectKeycodeEvent({ action: KeyAction.DOWN, keycode });
-      const upMsg = encodeInjectKeycodeEvent({ action: KeyAction.UP, keycode });
-      ws.send(downMsg.buffer as ArrayBuffer);
-      ws.send(upMsg.buffer as ArrayBuffer);
-    },
-    []
-  );
+  React.useEffect(() => {
+    const toolbarTitle =
+      pageState === 'loading' && deviceInfo === null
+        ? 'Loading...'
+        : deviceInfo?.brand && deviceInfo?.model
+          ? `${deviceInfo.brand} ${deviceInfo.model}`
+          : deviceInfo?.model || deviceSerial || 'Unknown device';
+    document.title = toolbarTitle;
+    return () => {
+      document.title = '';
+    };
+  }, [pageState, deviceInfo, deviceSerial]);
 
   return (
     <main className="device-page">
@@ -446,125 +138,31 @@ function DeviceApp() {
       )}
       <div className="device-stage" style={{ opacity: pageState === 'loading' ? 0 : 1 }}>
         <div className="device-stack">
-          {pageState === 'error' && (() => {
-            const error = formatStreamError(streamError!);
-            return (
-              <div className="device-error-float" role="alert" aria-live="assertive">
-                <span>{error.message}</span>
-                <button
-                  type="button"
-                  className="device-error-retry"
-                  aria-label="Retry"
-                  onClick={handleRetry}
-                >
-                  Retry
-                </button>
-              </div>
-            );
-          })()}
-          <div className="device-toolbar" role="status" aria-live="polite">
-            <div className="toolbar-left">
-              <span className="toolbar-title">{toolbarTitle}</span>
-              {toolbarMeta && (
-                <span className="toolbar-meta">{toolbarMeta}</span>
-              )}
-            </div>
-            <div className="toolbar-right">
-              <button type="button" className="toolbar-btn" aria-label="Screenshot" onClick={handleScreenshot}>
-                <img src={screenShotIcon} alt="" />
-              </button>
-              <div className="toolbar-divider" />
-              <div className="toolbar-nav">
-                <button type="button" className="toolbar-btn" aria-label="Back" onClick={() => sendNavigationKey(AndroidKeyCode.BACK)}>
-                  <img src={backIcon} alt="" />
-                </button>
-                <button type="button" className="toolbar-btn" aria-label="Home" onClick={() => sendNavigationKey(AndroidKeyCode.HOME)}>
-                  <img src={homeIcon} alt="" />
-                </button>
-                <button
-                  type="button"
-                  className="toolbar-btn"
-                  aria-label="Recent apps"
-                  onClick={() => sendNavigationKey(AndroidKeyCode.APP_SWITCH)}
-                >
-                  <img src={recentIcon} alt="" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="device-screen-wrapper"
-            style={{
-              width: `${(displaySize.width + SCREEN_BORDER_WIDTH * 2) * screenScale}px`,
-              height: `${(displaySize.height + SCREEN_BORDER_WIDTH * 2) * screenScale}px`,
-              transform: `scale(${screenScale})`,
-              transformOrigin: 'top left',
-              cursor: 'none',
-            }}
-            onMouseMove={(e) => {
-              setTouchPos(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : { x: e.clientX, y: e.clientY, pressed: false });
-              if (touchPos?.pressed) {
-                sendTouchAction(TouchAction.MOVE, e.clientX, e.clientY);
-              }
-            }}
-            onMouseDown={(e) => {
-              setTouchPos({ x: e.clientX, y: e.clientY, pressed: true });
-              sendTouchAction(TouchAction.DOWN, e.clientX, e.clientY);
-            }}
-            onMouseUp={() => {
-              setTouchPos(prev => prev ? { ...prev, pressed: false } : null);
-              if (touchPos) {
-                sendTouchAction(TouchAction.UP, touchPos.x, touchPos.y);
-              }
-            }}
-            onMouseLeave={() => setTouchPos(null)}
-          >
-            <Squircle
-              cornerRadius={
-                screenCornerRadius > 0
-                  ? screenCornerRadius + SCREEN_BORDER_WIDTH
-                  : 0
-              }
-              cornerSmoothing={0.8}
-              style={{
-                padding: `${SCREEN_BORDER_WIDTH}px`,
-                background: 'black',
-              }}
-            >
-              <Squircle
-                cornerRadius={screenCornerRadius}
-                cornerSmoothing={0.8}
-              >
-                <div
-                  className="device-screen"
-                  style={{
-                    width: `${displaySize.width}px`,
-                    height: `${displaySize.height}px`,
-                  }}
-                >
-                  <canvas ref={canvasRef} className="device-canvas" />
-                  {pageState === 'loading' && (
-                    <div className="device-placeholder">
-                      <div className="placeholder-loading">
-                        <Spinner name="rain" />
-                        <span>Waiting for stream...</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </Squircle>
-            </Squircle>
-          </div>
+          {pageState === 'error' && streamError && (
+            <DeviceErrorOverlay streamError={streamError} onRetry={handleRetryWithReset} />
+          )}
+          <DeviceToolbar
+            deviceInfo={deviceInfo}
+            deviceSerial={deviceSerial}
+            pageState={pageState as PageState}
+            frameSize={frameSize}
+            wsRef={wsRef}
+            onScreenshot={handleScreenshot}
+          />
+          <DeviceScreen
+            canvasRef={canvasRef}
+            displaySize={displaySize}
+            screenScale={screenScale}
+            screenCornerRadius={screenCornerRadius}
+            pageState={pageState as PageState}
+            deviceInfo={deviceInfo}
+            onMouseMove={handleMouseMove}
+            onMouseDown={handleMouseDown}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseLeave}
+          />
           {touchPos && (
-            <div
-              className="touch-indicator"
-              data-pressed={touchPos.pressed || undefined}
-              style={{
-                left: touchPos.x,
-                top: touchPos.y,
-              }}
-            />
+            <TouchIndicator x={touchPos.x} y={touchPos.y} pressed={touchPos.pressed} />
           )}
         </div>
       </div>
