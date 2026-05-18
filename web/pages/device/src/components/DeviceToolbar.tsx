@@ -1,8 +1,5 @@
 import React from 'react';
-import {
-  encodeInjectKeycodeEvent,
-  KeyAction,
-} from '@shared/scrcpy';
+import { encodeInjectKeycodeEvent, KeyAction } from '@shared/scrcpy';
 import { AndroidKeyCode } from '@shared/scrcpy';
 import backIcon from '../../../../assets/icon/sysbar_back.svg';
 import homeIcon from '../../../../assets/icon/sysbar_home.svg';
@@ -45,36 +42,49 @@ export function DeviceToolbar({
     .filter(Boolean)
     .join('  •  ');
 
-  const sendNavigationKey = React.useCallback(
-    (keycode: number) => {
-      const ws = wsRef.current;
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      const downMsg = encodeInjectKeycodeEvent({ action: KeyAction.DOWN, keycode });
-      const upMsg = encodeInjectKeycodeEvent({ action: KeyAction.UP, keycode });
-      ws.send(downMsg.buffer as ArrayBuffer);
-      ws.send(upMsg.buffer as ArrayBuffer);
-    },
-    []
-  );
+  const sendNavigationKey = React.useCallback((keycode: number) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const downMsg = encodeInjectKeycodeEvent({
+      action: KeyAction.DOWN,
+      keycode,
+    });
+    const upMsg = encodeInjectKeycodeEvent({ action: KeyAction.UP, keycode });
+    ws.send(downMsg.buffer as ArrayBuffer);
+    ws.send(upMsg.buffer as ArrayBuffer);
+  }, []);
 
   return (
     <div className="device-toolbar" role="status" aria-live="polite">
       <div className="toolbar-left">
         <span className="toolbar-title">{title}</span>
-        {meta && (
-          <span className="toolbar-meta">{meta}</span>
-        )}
+        {meta && <span className="toolbar-meta">{meta}</span>}
       </div>
       <div className="toolbar-right">
-        <button type="button" className="toolbar-btn" aria-label="Screenshot" onClick={onScreenshot}>
+        <button
+          type="button"
+          className="toolbar-btn"
+          aria-label="Screenshot"
+          onClick={onScreenshot}
+        >
           <img src={screenShotIcon} alt="" />
         </button>
         <div className="toolbar-divider" />
         <div className="toolbar-nav">
-          <button type="button" className="toolbar-btn" aria-label="Back" onClick={() => sendNavigationKey(AndroidKeyCode.BACK)}>
+          <button
+            type="button"
+            className="toolbar-btn"
+            aria-label="Back"
+            onClick={() => sendNavigationKey(AndroidKeyCode.BACK)}
+          >
             <img src={backIcon} alt="" />
           </button>
-          <button type="button" className="toolbar-btn" aria-label="Home" onClick={() => sendNavigationKey(AndroidKeyCode.HOME)}>
+          <button
+            type="button"
+            className="toolbar-btn"
+            aria-label="Home"
+            onClick={() => sendNavigationKey(AndroidKeyCode.HOME)}
+          >
             <img src={homeIcon} alt="" />
           </button>
           <button

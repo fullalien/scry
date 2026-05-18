@@ -13,9 +13,26 @@ export default defineConfig({
   plugins: [viteFastify({ spa: true }), react(), tailwindcss()],
   resolve: {
     alias: {
-      '@shared/scrcpy': path.resolve(rootProjectPath, 'src', 'shared', 'scrcpy'),
-      '@shared/constants': path.resolve(rootProjectPath, 'src', 'shared', 'constants', 'index.ts'),
-      '@shared/codec': path.resolve(rootProjectPath, 'src', 'shared', 'codec', 'index.ts'),
+      '@shared/scrcpy': path.resolve(
+        rootProjectPath,
+        'src',
+        'shared',
+        'scrcpy'
+      ),
+      '@shared/constants': path.resolve(
+        rootProjectPath,
+        'src',
+        'shared',
+        'constants',
+        'index.ts'
+      ),
+      '@shared/codec': path.resolve(
+        rootProjectPath,
+        'src',
+        'shared',
+        'codec',
+        'index.ts'
+      ),
     },
   },
   build: {

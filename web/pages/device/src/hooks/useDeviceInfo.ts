@@ -33,7 +33,9 @@ export function useDeviceInfo(deviceSerial: string | null): AdbDevice | null {
     };
 
     void loadDeviceInfo();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [deviceSerial]);
 
   return deviceInfo;

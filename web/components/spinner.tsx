@@ -1,7 +1,11 @@
 import React from 'react';
 import spinners from 'unicode-animations';
 
-export function Spinner({ name = 'waverows' }: { name?: keyof typeof spinners }) {
+export function Spinner({
+  name = 'waverows',
+}: {
+  name?: keyof typeof spinners;
+}) {
   const [frame, setFrame] = React.useState(0);
   const s = spinners[name];
 

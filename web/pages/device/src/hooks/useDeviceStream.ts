@@ -1,8 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { ScrcpyH264Decoder } from '@shared/codec';
-import {
-  SCRCPY_DEVICE_STREAM_PATH,
-} from '@shared/constants';
+import { SCRCPY_DEVICE_STREAM_PATH } from '@shared/constants';
 import { STREAM_TIMEOUT_MS } from '../constants';
 
 export type Size = { width: number; height: number };
@@ -94,7 +92,9 @@ export function useDeviceStream(
 
     let firstFrame = true;
     ws.onmessage = (e: MessageEvent<ArrayBuffer | string>) => {
-      console.info('Received WebSocket message', { data: e.data instanceof ArrayBuffer ? '[binary data]' : e.data });
+      console.info('Received WebSocket message', {
+        data: e.data instanceof ArrayBuffer ? '[binary data]' : e.data,
+      });
       if (typeof e.data === 'string') {
         return;
       }

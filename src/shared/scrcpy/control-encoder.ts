@@ -82,8 +82,14 @@ export function encodeInjectTouchEvent(params: {
   view.setUint8(0, ControlMessageType.INJECT_TOUCH_EVENT);
   view.setUint8(1, params.action);
   // pointerId: 0xFFFFFFFFFFFFFFFF for mouse (8 bytes of 0xFF)
-  bytes[2] = 0xff; bytes[3] = 0xff; bytes[4] = 0xff; bytes[5] = 0xff;
-  bytes[6] = 0xff; bytes[7] = 0xff; bytes[8] = 0xff; bytes[9] = 0xff;
+  bytes[2] = 0xff;
+  bytes[3] = 0xff;
+  bytes[4] = 0xff;
+  bytes[5] = 0xff;
+  bytes[6] = 0xff;
+  bytes[7] = 0xff;
+  bytes[8] = 0xff;
+  bytes[9] = 0xff;
   view.setUint32(10, Math.round(params.x), false);
   view.setUint32(14, Math.round(params.y), false);
   view.setUint16(18, params.screenWidth ?? 0, false);

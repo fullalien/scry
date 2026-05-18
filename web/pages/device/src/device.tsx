@@ -8,7 +8,11 @@ import {
   type Size,
 } from './utils/resolution.js';
 import { getDeviceSerialFromUrl } from './utils/url.js';
-import { DEFAULT_FALLBACK_DPI, DEFAULT_SCREEN_RADIUS, SCREEN_BORDER_WIDTH } from './constants.js';
+import {
+  DEFAULT_FALLBACK_DPI,
+  DEFAULT_SCREEN_RADIUS,
+  SCREEN_BORDER_WIDTH,
+} from './constants.js';
 import { useViewport } from './hooks/useViewport.js';
 import { useDeviceInfo } from './hooks/useDeviceInfo.js';
 import { useDeviceStream, type PageState } from './hooks/useDeviceStream.js';
@@ -35,8 +39,15 @@ function DeviceApp() {
   const deviceSerial = getDeviceSerialFromUrl();
   const deviceInfo = useDeviceInfo(deviceSerial);
   const [retryKey, setRetryKey] = React.useState(0);
-  const { pageState, streamError, frameSize, wsRef, handleRetry } = useDeviceStream(deviceSerial, canvasRef, retryKey);
-  const { touchPos, handleMouseMove, handleMouseDown, handleMouseUp, handleMouseLeave } = useTouchInput(wsRef, canvasRef, frameSize);
+  const { pageState, streamError, frameSize, wsRef, handleRetry } =
+    useDeviceStream(deviceSerial, canvasRef, retryKey);
+  const {
+    touchPos,
+    handleMouseMove,
+    handleMouseDown,
+    handleMouseUp,
+    handleMouseLeave,
+  } = useTouchInput(wsRef, canvasRef, frameSize);
   useKeyboardInput(wsRef, pageState);
 
   const handleRetryWithReset = React.useCallback(() => {
@@ -103,9 +114,10 @@ function DeviceApp() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const deviceName = deviceInfo?.brand && deviceInfo?.model
-        ? `${deviceInfo.brand}_${deviceInfo.model}`
-        : deviceInfo?.model || deviceSerial || 'device';
+      const deviceName =
+        deviceInfo?.brand && deviceInfo?.model
+          ? `${deviceInfo.brand}_${deviceInfo.model}`
+          : deviceInfo?.model || deviceSerial || 'device';
       const safeName = deviceName.replace(/\s+/g, '_');
       const now = new Date();
       const pad = (n: number) => n.toString().padStart(2, '0');
@@ -136,10 +148,16 @@ function DeviceApp() {
           <Spinner name="waverows" />
         </div>
       )}
-      <div className="device-stage" style={{ opacity: pageState === 'loading' ? 0 : 1 }}>
+      <div
+        className="device-stage"
+        style={{ opacity: pageState === 'loading' ? 0 : 1 }}
+      >
         <div className="device-stack">
           {pageState === 'error' && streamError && (
-            <DeviceErrorOverlay streamError={streamError} onRetry={handleRetryWithReset} />
+            <DeviceErrorOverlay
+              streamError={streamError}
+              onRetry={handleRetryWithReset}
+            />
           )}
           <DeviceToolbar
             deviceInfo={deviceInfo}
@@ -162,7 +180,11 @@ function DeviceApp() {
             onMouseLeave={handleMouseLeave}
           />
           {touchPos && (
-            <TouchIndicator x={touchPos.x} y={touchPos.y} pressed={touchPos.pressed} />
+            <TouchIndicator
+              x={touchPos.x}
+              y={touchPos.y}
+              pressed={touchPos.pressed}
+            />
           )}
         </div>
       </div>

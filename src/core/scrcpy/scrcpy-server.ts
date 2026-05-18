@@ -38,7 +38,10 @@ import type {
   ScrcpyServerStats,
 } from './scrcpy-server.types.js';
 import { SESSION_HEADER_SIZE } from '../../shared/scrcpy/header.js';
-import { parseSessionHeader, isSessionPacket } from '../../shared/scrcpy/session.js';
+import {
+  parseSessionHeader,
+  isSessionPacket,
+} from '../../shared/scrcpy/session.js';
 import {
   parseMediaHeader,
   buildVideoFrame,
@@ -315,7 +318,9 @@ export class ScrcpyServer extends EventEmitter {
     try {
       // Give the JVM a moment to start before the first connection attempt.
       await sleep(800);
-      logger.info('[ScrcpyServer] Connecting to server socket…', { socketName });
+      logger.info('[ScrcpyServer] Connecting to server socket…', {
+        socketName,
+      });
       await this.connectAndHandshake(socketName);
     } catch (err) {
       logger.error('[ScrcpyServer] Handshake failed', {
@@ -340,7 +345,9 @@ export class ScrcpyServer extends EventEmitter {
 
     // should connect control before reading video data
     if (this.controlEnabled) {
-      logger.info('[ScrcpyServer] Control enabled, connecting to control socket…');
+      logger.info(
+        '[ScrcpyServer] Control enabled, connecting to control socket…'
+      );
       void this.connectControlSocket();
     }
 
@@ -430,7 +437,7 @@ export class ScrcpyServer extends EventEmitter {
         (err instanceof Error ? err.message : String(err));
       throw new Error(
         `[ScrcpyServer] Video socket closed during handshake (reading ${n}B). ` +
-        `Shell exit: ${msg}. Check server logs above.`
+          `Shell exit: ${msg}. Check server logs above.`
       );
     }
   }
@@ -487,11 +494,11 @@ export class ScrcpyServer extends EventEmitter {
         const error =
           err instanceof Error
             ? new Error(
-              `[ScrcpyServer] Stream failed after ${this.stats.packets} packet(s): ${err.message}`
-            )
+                `[ScrcpyServer] Stream failed after ${this.stats.packets} packet(s): ${err.message}`
+              )
             : new Error(
-              `[ScrcpyServer] Stream failed after ${this.stats.packets} packet(s): ${String(err)}`
-            );
+                `[ScrcpyServer] Stream failed after ${this.stats.packets} packet(s): ${String(err)}`
+              );
         this.emit('error', error);
         this.emit('exit', 1, null);
       }

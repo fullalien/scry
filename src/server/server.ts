@@ -7,8 +7,21 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { ScrcpyManager } from '../core/scrcpy/scrcpy-manager.js';
 import { logger } from '../core/logger/logger.js';
-import { registerDeviceHandlers } from './handlers/device-handler.js';
-import { registerScrcpyHandlers } from './handlers/scrcpy-handler.js';
+import {
+  DEVICES_PATH,
+  SCRCPY_PATH,
+  SCRCPY_STOP_PATH,
+  SCRCPY_STREAM_PATH,
+  SCRCPY_DEVICE_STREAM_PATH,
+} from '../shared/constants/path.server.js';
+import { listDevices } from './handlers/device-handler.js';
+import {
+  listSessions,
+  startSession,
+  stopSession,
+  scrcpyStream,
+  scrcpyDeviceStream,
+} from './handlers/scrcpy-handler.js';
 
 export type ServerOptions = {
   scrcpyVideoBitRate?: number;
@@ -29,8 +42,8 @@ export async function createServer(options: ServerOptions) {
   await app.register(fastifyWebsocket);
   await registerViteFastify(app);
 
-  registerDeviceHandlers(app);
-  registerScrcpyHandlers(app, scrcpyManager, options);
+  registerDeviceRoutes(app);
+  registerScrcpyRoutes(app, scrcpyManager, options);
 
   app.addHook('onClose', () => {
     scrcpyManager.stopAll();
@@ -51,9 +64,14 @@ async function registerViteFastify(app: FastifyInstance): Promise<void> {
     decorateReply: false,
   });
 
-  // Cache HTML files to avoid repeated reads and potential resource leaks
-  const deviceHtml = fs.readFileSync(path.join(webDir, 'pages', 'device', 'index.html'), 'utf8');
-  const homeHtml = fs.readFileSync(path.join(webDir, 'pages', 'home', 'index.html'), 'utf8');
+  const deviceHtml = fs.readFileSync(
+    path.join(webDir, 'pages', 'device', 'index.html'),
+    'utf8'
+  );
+  const homeHtml = fs.readFileSync(
+    path.join(webDir, 'pages', 'home', 'index.html'),
+    'utf8'
+  );
 
   app.get('/device/*', async (_request, reply) => {
     return reply.type('text/html').send(deviceHtml);
@@ -62,4 +80,24 @@ async function registerViteFastify(app: FastifyInstance): Promise<void> {
   app.get('/*', async (_request, reply) => {
     return reply.type('text/html').send(homeHtml);
   });
+}
+
+function registerDeviceRoutes(app: FastifyInstance) {
+  app.get(DEVICES_PATH, listDevices);
+}
+
+function registerScrcpyRoutes(
+  app: FastifyInstance,
+  scrcpyManager: ScrcpyManager,
+  options: ServerOptions
+) {
+  app.get(SCRCPY_PATH, listSessions(scrcpyManager));
+  app.post(SCRCPY_PATH, startSession(scrcpyManager, options));
+  app.post(SCRCPY_STOP_PATH, stopSession(scrcpyManager));
+  app.get(SCRCPY_STREAM_PATH, { websocket: true }, scrcpyStream(scrcpyManager));
+  app.get(
+    SCRCPY_DEVICE_STREAM_PATH,
+    { websocket: true },
+    scrcpyDeviceStream(scrcpyManager, options)
+  );
 }

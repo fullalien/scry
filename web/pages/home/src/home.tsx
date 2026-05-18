@@ -11,11 +11,7 @@ import {
   Cpu,
   Proportions,
 } from 'lucide-react';
-import {
-  DEVICES_PATH,
-  SCRCPY_PATH,
-  SCRCPY_STOP_PATH,
-} from '@shared/constants';
+import { DEVICES_PATH, SCRCPY_PATH, SCRCPY_STOP_PATH } from '@shared/constants';
 import './home.css';
 
 type AdbDevice = {

@@ -216,8 +216,7 @@ export class ScrcpyH264Decoder {
     }
     this.stats.frames += 1;
 
-    const isKey =
-      (ptsAndFlags & PKT_FLAG_KEY_FRAME) !== 0n || hasIdrNal(data);
+    const isKey = (ptsAndFlags & PKT_FLAG_KEY_FRAME) !== 0n || hasIdrNal(data);
     if (isKey) {
       this.stats.keyframes += 1;
     }

@@ -6,7 +6,10 @@ type DeviceErrorOverlayProps = {
   onRetry: () => void;
 };
 
-export function DeviceErrorOverlay({ streamError, onRetry }: DeviceErrorOverlayProps) {
+export function DeviceErrorOverlay({
+  streamError,
+  onRetry,
+}: DeviceErrorOverlayProps) {
   const error = formatStreamError(streamError);
 
   return (

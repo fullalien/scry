@@ -47,9 +47,7 @@ export function DeviceScreen({
     >
       <Squircle
         cornerRadius={
-          screenCornerRadius > 0
-            ? screenCornerRadius + SCREEN_BORDER_WIDTH
-            : 0
+          screenCornerRadius > 0 ? screenCornerRadius + SCREEN_BORDER_WIDTH : 0
         }
         cornerSmoothing={0.8}
         style={{
@@ -57,10 +55,7 @@ export function DeviceScreen({
           background: 'black',
         }}
       >
-        <Squircle
-          cornerRadius={screenCornerRadius}
-          cornerSmoothing={0.8}
-        >
+        <Squircle cornerRadius={screenCornerRadius} cornerSmoothing={0.8}>
           <div
             className="device-screen"
             style={{

@@ -134,7 +134,8 @@ body {
 .toolbar-btn img {
   width: 20px;
   height: 20px;
-  filter: brightness(0) saturate(100%) invert(24%) sepia(8%) saturate(400%) hue-rotate(175deg) brightness(95%) contrast(88%);
+  filter: brightness(0) saturate(100%) invert(24%) sepia(8%) saturate(400%)
+    hue-rotate(175deg) brightness(95%) contrast(88%);
 }
 
 .toolbar-btn:hover {
@@ -146,8 +147,9 @@ body {
 }
 
 .device-screen-wrapper {
-  filter:
-    drop-shadow(0 1px 6px rgb(0 0 0 / 15%)) drop-shadow(0 4px 12px rgb(0 0 0 / 20%)) drop-shadow(0 8px 20px rgb(0 0 0 / 12%));
+  filter: drop-shadow(0 1px 6px rgb(0 0 0 / 15%))
+    drop-shadow(0 4px 12px rgb(0 0 0 / 20%))
+    drop-shadow(0 8px 20px rgb(0 0 0 / 12%));
 }
 
 .device-screen {
@@ -248,7 +250,10 @@ body {
   pointer-events: none;
   box-shadow: 0 0 6px rgb(0 0 0 / 20%);
   z-index: 999;
-  transition: transform 80ms ease, background 80ms ease, box-shadow 80ms ease;
+  transition:
+    transform 80ms ease,
+    background 80ms ease,
+    box-shadow 80ms ease;
 }
 
 .touch-indicator[data-pressed] {

@@ -99,10 +99,13 @@ export class ScrcpyManager {
         if (timer) {
           clearTimeout(timer);
           this.stopTimers.delete(sessionId);
-          logger.debug('[ScrcpyManager] Cancelled auto-stop timer for rejoining viewer', {
-            sessionId,
-            deviceSerial,
-          });
+          logger.debug(
+            '[ScrcpyManager] Cancelled auto-stop timer for rejoining viewer',
+            {
+              sessionId,
+              deviceSerial,
+            }
+          );
         }
 
         entry.viewerCount++;
@@ -165,11 +168,14 @@ export class ScrcpyManager {
             this.stopTimers.delete(id);
           }, 5000);
           this.stopTimers.set(id, timer);
-          logger.info('[ScrcpyManager] Last viewer disconnected, scheduled auto-stop', {
-            sessionId: id,
-            deviceSerial,
-            delayMs: 5000,
-          });
+          logger.info(
+            '[ScrcpyManager] Last viewer disconnected, scheduled auto-stop',
+            {
+              sessionId: id,
+              deviceSerial,
+              delayMs: 5000,
+            }
+          );
         }
         return;
       }
