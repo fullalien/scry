@@ -44,6 +44,7 @@ export class ScrcpyManager {
     string,
     Promise<ScrcpySession | null>
   >();
+  private readonly stopTimers = new Map<string, NodeJS.Timeout>();
 
   private constructor() {}
 
@@ -92,6 +93,18 @@ export class ScrcpyManager {
         entry.session.deviceSerial === deviceSerial &&
         entry.session.status === 'running'
       ) {
+        // Cancel any pending auto-stop timer since a new viewer is joining
+        const sessionId = entry.session.id;
+        const timer = this.stopTimers.get(sessionId);
+        if (timer) {
+          clearTimeout(timer);
+          this.stopTimers.delete(sessionId);
+          logger.info('[ScrcpyManager] Cancelled auto-stop timer for rejoining viewer', {
+            sessionId,
+            deviceSerial,
+          });
+        }
+
         entry.viewerCount++;
         logger.info('[ScrcpyManager] Viewer added to existing session', {
           sessionId: entry.session.id,
@@ -139,14 +152,24 @@ export class ScrcpyManager {
           viewerCount: entry.viewerCount,
         });
         if (entry.viewerCount === 0) {
-          logger.info(
-            '[ScrcpyManager] Last viewer disconnected, auto-stopping',
-            {
-              sessionId: id,
-              deviceSerial,
+          // Debounce auto-stop to prevent unnecessary restarts on page refresh
+          const timer = setTimeout(() => {
+            const current = this.entries.get(id);
+            if (current && current.viewerCount === 0) {
+              logger.info('[ScrcpyManager] Auto-stopping after grace period', {
+                sessionId: id,
+                deviceSerial,
+              });
+              entry.process.stop();
             }
-          );
-          entry.process.stop();
+            this.stopTimers.delete(id);
+          }, 5000);
+          this.stopTimers.set(id, timer);
+          logger.info('[ScrcpyManager] Last viewer disconnected, scheduled auto-stop', {
+            sessionId: id,
+            deviceSerial,
+            delayMs: 5000,
+          });
         }
         return;
       }
@@ -242,6 +265,13 @@ export class ScrcpyManager {
     const entry = this.entries.get(id);
     if (!entry) return 'not-found';
     if (entry.session.status !== 'running') return 'already-stopped';
+
+    // Clear any pending auto-stop timer
+    const timer = this.stopTimers.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      this.stopTimers.delete(id);
+    }
 
     logger.info('stopping scrcpy-session', {
       sessionId: id,
