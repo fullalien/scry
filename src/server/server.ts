@@ -52,10 +52,8 @@ async function registerViteFastify(app: FastifyInstance): Promise<void> {
   });
 
   // Cache HTML files to avoid repeated reads and potential resource leaks
-  const deviceHtmlPath = path.join(webDir, 'pages', 'device', 'index.html');
-  const homeHtmlPath = path.join(webDir, 'pages', 'home', 'index.html');
-  const deviceHtml = fs.readFileSync(deviceHtmlPath, 'utf8');
-  const homeHtml = fs.readFileSync(homeHtmlPath, 'utf8');
+  const deviceHtml = fs.readFileSync(path.join(webDir, 'pages', 'device', 'index.html'), 'utf8');
+  const homeHtml = fs.readFileSync(path.join(webDir, 'pages', 'home', 'index.html'), 'utf8');
 
   app.get('/device/*', async (_request, reply) => {
     return reply.type('text/html').send(deviceHtml);

@@ -2,7 +2,17 @@ import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { logger } from '../logger/logger.js';
 
-const execFileAsync = promisify(execFile);
+const execAdb = promisify(execFile);
+
+/**
+ * Validates device ID format to prevent command injection.
+ * @throws {Error} if deviceId format is invalid
+ */
+export function validateDeviceId(deviceId: string): void {
+  if (!/^[a-zA-Z0-9._:-]+$/.test(deviceId)) {
+    throw new Error('Invalid device ID format');
+  }
+}
 
 export type AdbDevice = {
   id: string;
@@ -44,10 +54,7 @@ const deviceDetailsCache = new Map<string, DeviceDetails>();
 
 async function getDeviceDetails(deviceId: string): Promise<DeviceDetails> {
   try {
-    // Validate deviceId format to prevent command injection
-    if (!/^[a-zA-Z0-9._:-]+$/.test(deviceId)) {
-      throw new Error('Invalid device ID format');
-    }
+    validateDeviceId(deviceId);
 
     // Query all props + wm size/density in one shell invocation
     const propsQuery = DEVICE_PROPS.map(p => `getprop ${p}`).join('; ');
@@ -112,7 +119,7 @@ async function getDeviceDetails(deviceId: string): Promise<DeviceDetails> {
 }
 
 export async function listAdbDevices(): Promise<AdbDevice[]> {
-  const { stdout } = await execFileAsync('adb', ['devices']);
+  const { stdout } = await execAdb('adb', ['devices']);
 
   const basicDevices = stdout
     .split('\n')
@@ -150,7 +157,7 @@ export async function adbPush(
   local: string,
   remote: string
 ): Promise<void> {
-  await execFileAsync('adb', ['-s', deviceId, 'push', local, remote]);
+  await execAdb('adb', ['-s', deviceId, 'push', local, remote]);
 }
 
 export async function adbForward(
@@ -158,7 +165,7 @@ export async function adbForward(
   localPort: number,
   remoteAbstract: string
 ): Promise<void> {
-  await execFileAsync('adb', [
+  await execAdb('adb', [
     '-s',
     deviceId,
     'forward',
@@ -172,7 +179,7 @@ export async function adbForwardRemove(
   localPort: number
 ): Promise<void> {
   try {
-    await execFileAsync('adb', [
+    await execAdb('adb', [
       '-s',
       deviceId,
       'forward',
@@ -190,7 +197,7 @@ export async function adbForwardRemove(
 
 /** Run `adb shell <cmd>` and return stdout (rejects on non-zero exit). */
 export async function adbShell(deviceId: string, cmd: string): Promise<string> {
-  const { stdout } = await execFileAsync('adb', ['-s', deviceId, 'shell', cmd]);
+  const { stdout } = await execAdb('adb', ['-s', deviceId, 'shell', cmd]);
   return stdout;
 }
 
