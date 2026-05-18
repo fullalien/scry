@@ -99,7 +99,7 @@ export class ScrcpyManager {
         if (timer) {
           clearTimeout(timer);
           this.stopTimers.delete(sessionId);
-          logger.info('[ScrcpyManager] Cancelled auto-stop timer for rejoining viewer', {
+          logger.debug('[ScrcpyManager] Cancelled auto-stop timer for rejoining viewer', {
             sessionId,
             deviceSerial,
           });

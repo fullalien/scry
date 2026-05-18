@@ -8,6 +8,9 @@ import {
   SCRCPY_DEVICE_STREAM_PATH,
 } from '../path.server.js';
 import { logger } from '../../core/logger/logger.js';
+import { validateDeviceId } from '../../core/adb/adb-client.js';
+
+const MAX_PENDING_FRAMES = 10;
 
 export function registerScrcpyHandlers(
   app: FastifyInstance,
@@ -33,9 +36,16 @@ export function registerScrcpyHandlers(
     }
 
     // Validate deviceSerial format to prevent command injection
-    if (typeof deviceSerial !== 'string' || !/^[a-zA-Z0-9._:-]+$/.test(deviceSerial)) {
+    if (typeof deviceSerial !== 'string') {
       reply.code(400);
       return { ok: false, error: 'Invalid deviceSerial format' };
+    }
+
+    try {
+      validateDeviceId(deviceSerial);
+    } catch (err) {
+      reply.code(400);
+      return { ok: false, error: err instanceof Error ? err.message : 'Invalid deviceSerial format' };
     }
 
     const result = await scrcpyManager.start(deviceSerial, {
@@ -81,7 +91,6 @@ export function registerScrcpyHandlers(
 
     const pendingFrames: Buffer[] = [];
     let flushed = false;
-    const MAX_PENDING_FRAMES = 30;
 
     const flushPending = () => {
       if (flushed || socket.readyState !== socket.OPEN) return;
@@ -181,8 +190,15 @@ export function registerScrcpyHandlers(
       const { deviceSerial } = request.params as { deviceSerial: string };
 
       // Validate deviceSerial format to prevent command injection
-      if (!deviceSerial || typeof deviceSerial !== 'string' || !/^[a-zA-Z0-9._:-]+$/.test(deviceSerial)) {
+      if (!deviceSerial || typeof deviceSerial !== 'string') {
         socket.close(1008, 'Invalid deviceSerial format');
+        return;
+      }
+
+      try {
+        validateDeviceId(deviceSerial);
+      } catch (err) {
+        socket.close(1008, err instanceof Error ? err.message : 'Invalid deviceSerial format');
         return;
       }
 
@@ -206,7 +222,6 @@ export function registerScrcpyHandlers(
 
       const pendingFrames: Buffer[] = [];
       let flushed = false;
-      const MAX_PENDING_FRAMES = 30;
 
       const flushPending = () => {
         if (flushed || socket.readyState !== socket.OPEN) return;
