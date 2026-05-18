@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { ScrcpyH264Decoder } from '../../../../lib/codec/h264';
 import {
   SCRCPY_DEVICE_STREAM_PATH,
-} from '../../../../lib/shared/path.constants';
+} from '@shared/constants';
 import { STREAM_TIMEOUT_MS } from '../constants';
 
 export type Size = { width: number; height: number };

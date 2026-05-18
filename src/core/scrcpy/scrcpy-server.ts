@@ -37,19 +37,19 @@ import type {
   ScrcpyServerOptions,
   ScrcpyServerStats,
 } from './scrcpy-server.types.js';
-import { SESSION_HEADER_SIZE } from './protocol/header.js';
-import { parseSessionHeader, isSessionPacket } from './protocol/session.js';
+import { SESSION_HEADER_SIZE } from '../../shared/scrcpy/header.js';
+import { parseSessionHeader, isSessionPacket } from '../../shared/scrcpy/session.js';
 import {
   parseMediaHeader,
   buildVideoFrame,
   hasIdrNal,
   findNalUnitType,
   MAX_VIDEO_PAYLOAD_SIZE,
-} from './protocol/video.js';
+} from '../../shared/scrcpy/video.js';
 import {
   parseDeviceMessage,
   type DeviceMessage,
-} from './protocol/device-message.js';
+} from '../../shared/scrcpy/device-message.js';
 
 const REMOTE_JAR = '/data/local/tmp/scrcpy-server-v4.0.jar';
 

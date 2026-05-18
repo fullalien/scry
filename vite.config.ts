@@ -5,12 +5,18 @@ import { viteFastify } from '@fastify/vite/plugin';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const pagesDir = path.resolve(__dirname, 'web', 'pages');
+const rootProjectPath = path.dirname(fileURLToPath(import.meta.url));
+const pagesDir = path.resolve(rootProjectPath, 'web', 'pages');
 
 export default defineConfig({
   root: 'web',
   plugins: [viteFastify({ spa: true }), react(), tailwindcss()],
+  resolve: {
+    alias: {
+      '@shared/scrcpy': path.resolve(rootProjectPath, 'src', 'shared', 'scrcpy'),
+      '@shared/constants': path.resolve(rootProjectPath, 'src', 'shared', 'constants', 'index.ts'),
+    },
+  },
   build: {
     target: 'esnext',
     outDir: '../dist',

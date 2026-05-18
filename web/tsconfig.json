@@ -12,7 +12,14 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@shared/scrcpy": ["../src/shared/scrcpy/index.ts"],
+      "@shared/scrcpy/*": ["../src/shared/scrcpy/*"],
+      "@shared/constants": ["../src/shared/constants/index.ts"],
+      "@shared/constants/*": ["../src/shared/constants/*"]
+    }
   },
   "include": ["."]
 }

@@ -15,7 +15,7 @@ import {
   DEVICES_PATH,
   SCRCPY_PATH,
   SCRCPY_STOP_PATH,
-} from '../../../lib/shared/path.constants.js';
+} from '@shared/constants';
 import './home.css';
 
 type AdbDevice = {

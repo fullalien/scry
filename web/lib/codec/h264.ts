@@ -21,10 +21,14 @@
  *   4. Drop frames when the decode queue is backlogged (> 2 queued).
  */
 
-export const VIDEO_MSG_TYPE = 0x01;
-const PACKET_FLAG_SESSION = 0x8000000000000000n; // bit 63
-const PACKET_FLAG_CONFIG = 0x4000000000000000n; // bit 62
-const PACKET_FLAG_KEY_FRAME = 0x2000000000000000n; // bit 61
+import {
+  VIDEO_MSG_TYPE,
+  PKT_FLAG_CONFIG,
+  PKT_FLAG_KEY_FRAME,
+} from '@shared/scrcpy';
+
+export { VIDEO_MSG_TYPE };
+
 const PTS_MASK = 0x1fffffffffffffffn; // lower 61 bits
 
 // ---------------------------------------------------------------------------
@@ -149,7 +153,7 @@ export class ScrcpyH264Decoder {
     const ptsHi = view.getUint32(1);
     const ptsLo = view.getUint32(5);
     const ptsAndFlags = (BigInt(ptsHi) << 32n) | BigInt(ptsLo);
-    const isConfig = (ptsAndFlags & PACKET_FLAG_CONFIG) !== 0n;
+    const isConfig = (ptsAndFlags & PKT_FLAG_CONFIG) !== 0n;
     const pts = ptsAndFlags & PTS_MASK;
     const dataOff = 9;
     const dataLen = buffer.byteLength - dataOff;
@@ -207,7 +211,7 @@ export class ScrcpyH264Decoder {
     this.stats.frames += 1;
 
     const isKey =
-      (ptsAndFlags & PACKET_FLAG_KEY_FRAME) !== 0n || hasIdrNal(data);
+      (ptsAndFlags & PKT_FLAG_KEY_FRAME) !== 0n || hasIdrNal(data);
     if (isKey) {
       this.stats.keyframes += 1;
     }

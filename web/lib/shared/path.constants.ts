@@ -1,1 +1,0 @@
-../../../src/server/path.server.ts

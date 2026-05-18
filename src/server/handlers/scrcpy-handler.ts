@@ -6,7 +6,7 @@ import {
   SCRCPY_STOP_PATH,
   SCRCPY_STREAM_PATH,
   SCRCPY_DEVICE_STREAM_PATH,
-} from '../path.server.js';
+} from '../../shared/constants/path.server.js';
 import { logger } from '../../core/logger/logger.js';
 import { validateDeviceId } from '../../core/adb/adb-client.js';
 

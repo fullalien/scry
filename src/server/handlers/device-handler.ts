@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { listAdbDevices } from '../../core/adb/adb-client.js';
-import { DEVICES_PATH } from '../path.server.js';
+import { DEVICES_PATH } from '../../shared/constants/path.server.js';
 import { logger } from '../../core/logger/logger.js';
 
 export function registerDeviceHandlers(app: FastifyInstance) {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DEVICES_PATH } from '../../../../lib/shared/path.constants';
+import { DEVICES_PATH } from '@shared/constants';
 
 export type AdbDevice = {
   id: string;
