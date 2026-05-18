@@ -4,7 +4,16 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "NodeNext",
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    "baseUrl": ".",
+    "paths": {
+      "@shared/scrcpy": ["src/shared/scrcpy/index.ts"],
+      "@shared/scrcpy/*": ["src/shared/scrcpy/*"],
+      "@shared/constants": ["src/shared/constants/index.ts"],
+      "@shared/constants/*": ["src/shared/constants/*"],
+      "@shared/codec": ["src/shared/codec/index.ts"],
+      "@shared/codec/*": ["src/shared/codec/*"]
+    }
   },
   "include": ["src"]
 }

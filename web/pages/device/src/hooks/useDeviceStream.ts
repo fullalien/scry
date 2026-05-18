@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
-import { ScrcpyH264Decoder } from '../../../../lib/codec/h264';
+import { ScrcpyH264Decoder } from '@shared/codec';
 import {
   SCRCPY_DEVICE_STREAM_PATH,
 } from '@shared/constants';

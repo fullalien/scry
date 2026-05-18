@@ -55,7 +55,7 @@ function findNalOffset(data: Uint8Array, nalType: number): number {
       if (
         headerOff !== -1 &&
         headerOff < data.length &&
-        (data[headerOff] & 0x1f) === nalType
+        (data[headerOff]! & 0x1f) === nalType
       ) {
         return headerOff;
       }
@@ -75,9 +75,9 @@ function hasIdrNal(data: Uint8Array): boolean {
 export function extractCodecString(data: Uint8Array): string {
   const off = findNalOffset(data, NAL_SPS);
   if (off !== -1 && off + 3 < data.length) {
-    const p = data[off + 1].toString(16).padStart(2, '0');
-    const c = data[off + 2].toString(16).padStart(2, '0');
-    const l = data[off + 3].toString(16).padStart(2, '0');
+    const p = data[off + 1]!.toString(16).padStart(2, '0');
+    const c = data[off + 2]!.toString(16).padStart(2, '0');
+    const l = data[off + 3]!.toString(16).padStart(2, '0');
     return `avc1.${p}${c}${l}`;
   }
   return 'avc1.42E01E';
@@ -131,16 +131,23 @@ export class ScrcpyH264Decoder {
     waitingForKeyframe: true,
   };
 
+  private readonly onFrame: (frame: VideoFrame) => void;
+  private readonly onError: DecoderErrorHandler;
+  private readonly onStats: DecoderStatsHandler;
+
   constructor(
-    private readonly onFrame: (frame: VideoFrame) => void,
-    private readonly onError: DecoderErrorHandler = e =>
+    onFrame: (frame: VideoFrame) => void,
+    onError: DecoderErrorHandler = e =>
       console.error('[H264] Decoder error:', e),
-    private readonly onStats: DecoderStatsHandler = () => {}
-  ) {}
+    onStats: DecoderStatsHandler = () => {}
+  ) {
+    this.onFrame = onFrame;
+    this.onError = onError;
+    this.onStats = onStats;
+  }
 
   /** Feed one raw WebSocket binary message. */
   push(buffer: ArrayBuffer): void {
-    const size = buffer.byteLength;
     const type = new Uint8Array(buffer, 0, 1)[0];
 
     if (type !== VIDEO_MSG_TYPE) {
@@ -156,7 +163,6 @@ export class ScrcpyH264Decoder {
     const isConfig = (ptsAndFlags & PKT_FLAG_CONFIG) !== 0n;
     const pts = ptsAndFlags & PTS_MASK;
     const dataOff = 9;
-    const dataLen = buffer.byteLength - dataOff;
 
     this.stats.packets += 1;
 
