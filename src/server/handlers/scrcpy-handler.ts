@@ -36,16 +36,9 @@ export function registerScrcpyHandlers(
     }
 
     // Validate deviceSerial format to prevent command injection
-    if (typeof deviceSerial !== 'string') {
+    if (typeof deviceSerial !== 'string' || !validateDeviceId(deviceSerial)) {
       reply.code(400);
       return { ok: false, error: 'Invalid deviceSerial format' };
-    }
-
-    try {
-      validateDeviceId(deviceSerial);
-    } catch (err) {
-      reply.code(400);
-      return { ok: false, error: err instanceof Error ? err.message : 'Invalid deviceSerial format' };
     }
 
     const result = await scrcpyManager.start(deviceSerial, {
@@ -190,15 +183,8 @@ export function registerScrcpyHandlers(
       const { deviceSerial } = request.params as { deviceSerial: string };
 
       // Validate deviceSerial format to prevent command injection
-      if (!deviceSerial || typeof deviceSerial !== 'string') {
+      if (!deviceSerial || typeof deviceSerial !== 'string' || !validateDeviceId(deviceSerial)) {
         socket.close(1008, 'Invalid deviceSerial format');
-        return;
-      }
-
-      try {
-        validateDeviceId(deviceSerial);
-      } catch (err) {
-        socket.close(1008, err instanceof Error ? err.message : 'Invalid deviceSerial format');
         return;
       }
 
