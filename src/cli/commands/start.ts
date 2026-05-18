@@ -15,7 +15,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export function registerStartCommand(program: Command) {
   program
     .command('start')
-    .description('Start the scrcpy-web server')
+    .description('Start the scry server')
     .option('--host <host>', 'Host', DEFAULT_HOST)
     .option('--port <port>', 'Port', DEFAULT_PORT.toString())
     .option('--foreground', 'Run in foreground for debugging', false)

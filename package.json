@@ -1,5 +1,5 @@
 {
-  "name": "scrcpy-web",
+  "name": "scry",
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
@@ -8,7 +8,7 @@
     "email": "baifanf@hotmail.com"
   },
   "bin": {
-    "scrcpy-web": "dist/bin.js"
+    "scry": "dist/bin.js"
   },
   "engines": {
     "node": ">=20"

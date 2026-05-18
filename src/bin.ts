@@ -18,7 +18,7 @@ async function main() {
     console: false,
   });
 
-  program.name(APP_NAME).description('scrcpy-web CLI').version('0.1.0');
+  program.name(APP_NAME).description('scry CLI').version('0.1.0');
 
   registerStartCommand(program);
   registerDevicesCommand(program);
