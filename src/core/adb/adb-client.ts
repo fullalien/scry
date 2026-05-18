@@ -4,14 +4,15 @@ import { logger } from '../logger/logger.js';
 
 const execAdb = promisify(execFile);
 
+// Cache regex for device ID validation
+const DEVICE_ID_REGEX = /^[a-zA-Z0-9._:-]+$/;
+
 /**
  * Validates device ID format to prevent command injection.
- * @throws {Error} if deviceId format is invalid
+ * @returns true if device ID is valid, false otherwise
  */
-export function validateDeviceId(deviceId: string): void {
-  if (!/^[a-zA-Z0-9._:-]+$/.test(deviceId)) {
-    throw new Error('Invalid device ID format');
-  }
+export function validateDeviceId(deviceId: string): boolean {
+  return DEVICE_ID_REGEX.test(deviceId);
 }
 
 export type AdbDevice = {
@@ -54,7 +55,9 @@ const deviceDetailsCache = new Map<string, DeviceDetails>();
 
 async function getDeviceDetails(deviceId: string): Promise<DeviceDetails> {
   try {
-    validateDeviceId(deviceId);
+    if (!validateDeviceId(deviceId)) {
+      throw new Error('Invalid device ID format');
+    }
 
     // Query all props + wm size/density in one shell invocation
     const propsQuery = DEVICE_PROPS.map(p => `getprop ${p}`).join('; ');
@@ -187,7 +190,7 @@ export async function adbForwardRemove(
       `tcp:${localPort}`,
     ]);
   } catch (err) {
-    logger.debug('[adb] Failed to remove forward', {
+    logger.error('[adb] Failed to remove forward', {
       deviceId,
       port: localPort,
       error: err instanceof Error ? err.message : String(err),
