@@ -45,6 +45,8 @@ export function useTouchInput(
         action,
         x: clampedX,
         y: clampedY,
+        screenWidth: frameSize.width,
+        screenHeight: frameSize.height,
       });
       ws.send(
         msg.buffer.slice(

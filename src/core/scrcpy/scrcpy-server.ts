@@ -348,7 +348,7 @@ export class ScrcpyServer extends EventEmitter {
       logger.info(
         '[ScrcpyServer] Control enabled, connecting to control socket…'
       );
-      void this.connectControlSocket();
+      await this.connectControlSocket();
     }
 
     // should connect audio before reading video data
@@ -548,6 +548,7 @@ export class ScrcpyServer extends EventEmitter {
       !this.controlSocket ||
       this.controlSocket.destroyed
     ) {
+      console.warn('[ScrcpyServer] Control message dropped - control socket not ready');
       return;
     }
 
