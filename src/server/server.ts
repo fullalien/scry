@@ -24,9 +24,9 @@ import {
 } from './handlers/scrcpy-handler.js';
 
 export type ServerOptions = {
-  scrcpyVideoBitRate?: number;
-  scrcpyMaxSize?: number;
-  scrcpyMaxFps?: number;
+  scrcpyVideoBitRate: number;
+  scrcpyMaxSize: number;
+  scrcpyMaxFps: number;
 };
 
 const projectRoot = path.resolve(
