@@ -548,7 +548,9 @@ export class ScrcpyServer extends EventEmitter {
       !this.controlSocket ||
       this.controlSocket.destroyed
     ) {
-      console.warn('[ScrcpyServer] Control message dropped - control socket not ready');
+      console.warn(
+        '[ScrcpyServer] Control message dropped - control socket not ready'
+      );
       return;
     }
 

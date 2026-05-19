@@ -81,15 +81,19 @@ export function encodeInjectTouchEvent(params: {
   const bytes = new Uint8Array(buf);
   view.setUint8(0, ControlMessageType.INJECT_TOUCH_EVENT);
   view.setUint8(1, params.action);
-  // pointerId: 0xFFFFFFFFFFFFFFFF for mouse (8 bytes of 0xFF)
-  bytes[2] = 0xff;
-  bytes[3] = 0xff;
-  bytes[4] = 0xff;
-  bytes[5] = 0xff;
-  bytes[6] = 0xff;
-  bytes[7] = 0xff;
-  bytes[8] = 0xff;
-  bytes[9] = 0xff;
+  // pointerId: 0xFFFFFFFFFFFFFFFF for mouse (8 bytes of 0xFF), or custom value for multi-touch
+  const pointerId = params.pointerId ?? 0xffffffffffffffff;
+  const pointerBytes = new Uint8Array([
+    pointerId & 0xff,
+    (pointerId >> 8) & 0xff,
+    (pointerId >> 16) & 0xff,
+    (pointerId >> 24) & 0xff,
+    (pointerId >> 32) & 0xff,
+    (pointerId >> 40) & 0xff,
+    (pointerId >> 48) & 0xff,
+    (pointerId >> 56) & 0xff,
+  ]);
+  bytes.set(pointerBytes, 2);
   view.setUint32(10, Math.round(params.x), false);
   view.setUint32(14, Math.round(params.y), false);
   view.setUint16(18, params.screenWidth ?? 0, false);

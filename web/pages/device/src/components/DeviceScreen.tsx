@@ -15,8 +15,9 @@ type DeviceScreenProps = {
   deviceInfo: AdbDevice | null;
   onMouseMove: (e: React.MouseEvent) => void;
   onMouseDown: (e: React.MouseEvent) => void;
-  onMouseUp: () => void;
+  onMouseUp: (e: React.MouseEvent) => void;
   onMouseLeave: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
 };
 
 export function DeviceScreen({
@@ -29,6 +30,7 @@ export function DeviceScreen({
   onMouseDown,
   onMouseUp,
   onMouseLeave,
+  onContextMenu,
 }: DeviceScreenProps) {
   return (
     <div
@@ -44,6 +46,7 @@ export function DeviceScreen({
       onMouseDown={onMouseDown}
       onMouseUp={onMouseUp}
       onMouseLeave={onMouseLeave}
+      onContextMenu={onContextMenu}
     >
       <Squircle
         cornerRadius={

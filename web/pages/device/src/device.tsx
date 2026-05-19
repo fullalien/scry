@@ -43,10 +43,12 @@ function DeviceApp() {
     useDeviceStream(deviceSerial, canvasRef, retryKey);
   const {
     touchPos,
+    secondaryTouchPos,
     handleMouseMove,
     handleMouseDown,
     handleMouseUp,
     handleMouseLeave,
+    handleContextMenu,
   } = useTouchInput(wsRef, canvasRef, frameSize);
   useKeyboardInput(wsRef, pageState);
 
@@ -178,12 +180,20 @@ function DeviceApp() {
             onMouseDown={handleMouseDown}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseLeave}
+            onContextMenu={handleContextMenu}
           />
           {touchPos && (
             <TouchIndicator
               x={touchPos.x}
               y={touchPos.y}
               pressed={touchPos.pressed}
+            />
+          )}
+          {secondaryTouchPos && (
+            <TouchIndicator
+              x={secondaryTouchPos.x}
+              y={secondaryTouchPos.y}
+              pressed={secondaryTouchPos.pressed}
             />
           )}
         </div>
