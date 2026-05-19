@@ -44,13 +44,6 @@ export function registerDoctorCommand(program: Command, config: AppConfig) {
         adbError = e?.message || e?.stderr || String(e);
       }
 
-      try {
-        await execFileAsync(config.scrcpy.path, ['--version']);
-        scrcpyOk = true;
-      } catch (e: any) {
-        scrcpyError = e?.message || e?.stderr || String(e);
-      }
-
       portAvailable = await isPortAvailable(host, port);
 
       console.log(`Node.js: ${process.version}`);
