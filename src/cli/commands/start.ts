@@ -5,19 +5,16 @@ import path from 'node:path';
 import http from 'node:http';
 import { serverStateManager } from '../../core/server-state.js';
 import { homedir } from 'node:os';
-import {
-  DEFAULT_HOST,
-  DEFAULT_PORT,
-} from '../../core/config/config.constants.js';
+import type { AppConfig } from '../../core/config/schema.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export function registerStartCommand(program: Command) {
+export function registerStartCommand(program: Command, config: AppConfig) {
   program
     .command('start')
     .description('Start the scry server')
-    .option('--host <host>', 'Host', DEFAULT_HOST)
-    .option('--port <port>', 'Port', DEFAULT_PORT.toString())
+    .option('--host <host>', 'Host', config.server.host)
+    .option('--port <port>', 'Port', config.server.port.toString())
     .option('--foreground', 'Run in foreground for debugging', false)
     .action(async options => {
       const host = options.host as string;
@@ -25,7 +22,7 @@ export function registerStartCommand(program: Command) {
       const foreground = options.foreground as boolean;
 
       if (foreground) {
-        await runForegroundServer(host, port);
+        await runForegroundServer(host, port, config);
         console.log(`Server running at http://${host}:${port}`);
         return;
       }
@@ -112,8 +109,12 @@ function tryHealthCheck(host: string, port: number): Promise<boolean> {
   });
 }
 
-async function runForegroundServer(host: string, port: number): Promise<void> {
+async function runForegroundServer(host: string, port: number, config: AppConfig): Promise<void> {
   const { createServer } = await import('../../server/server.js');
-  const server = await createServer({});
+  const server = await createServer({
+    scrcpyMaxSize: config.scrcpy.maxSize,
+    scrcpyVideoBitRate: config.scrcpy.videoBitRate,
+    scrcpyMaxFps: config.scrcpy.maxFps,
+  });
   await server.listen({ host, port });
 }
