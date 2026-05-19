@@ -20,7 +20,7 @@ async function main() {
 
   program.name(APP_NAME).description('scry CLI').version('0.1.0');
 
-  registerStartCommand(program);
+  registerStartCommand(program, config);
   registerDevicesCommand(program);
   registerDoctorCommand(program, config);
   registerStatusCommand(program);
