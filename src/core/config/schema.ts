@@ -16,13 +16,12 @@ export const ConfigSchema = z.object({
   scrcpy: z
     .object({
       path: z.string().default('scrcpy'),
-      /** Maximum dimension (width or height) in pixels. 0 = no limit (default). */
       maxSize: z.number().int().min(0).default(0),
       /** Video bit rate in bps (e.g. 4000000 = 4 Mbps). scrcpy v4+ requires a plain integer. */
       videoBitRate: z.number().int().positive().default(4_000_000),
-      maxFps: z.number().int().positive().optional(),
+      maxFps: z.number().int().positive().default(60),
     })
-    .default({ path: 'scrcpy', maxSize: 0, videoBitRate: 4_000_000 }),
+    .default({ path: 'scrcpy', maxSize: 0, videoBitRate: 4_000_000, maxFps: 60 }),
 });
 
 export type AppConfig = z.infer<typeof ConfigSchema>;
