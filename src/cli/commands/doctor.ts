@@ -33,8 +33,6 @@ export function registerDoctorCommand(program: Command, config: AppConfig) {
       const port = Number(options.port);
       let adbOk = false;
       let adbError = '';
-      let scrcpyOk = false;
-      let scrcpyError = '';
       let portAvailable = false;
 
       try {
@@ -48,7 +46,6 @@ export function registerDoctorCommand(program: Command, config: AppConfig) {
 
       console.log(`Node.js: ${process.version}`);
       console.log(`adb: ${adbOk ? 'ok' : `missing (${adbError})`}`);
-      console.log(`scrcpy: ${scrcpyOk ? 'ok' : `missing (${scrcpyError})`}`);
       console.log(
         `port ${host}:${port}: ${portAvailable ? 'available' : 'in use'}`
       );

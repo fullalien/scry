@@ -2,7 +2,7 @@
   "name": "scry",
   "version": "0.1.0",
   "type": "module",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": {
     "name": "Van Bai",
     "email": "baifanf@hotmail.com"
@@ -21,7 +21,6 @@
     "dev": "concurrently -n backend,frontend -c blue,green \"tsc --watch\" \"vite build --watch\"",
     "dev:devices": "tsx src/bin.ts devices",
     "dev:doctor": "tsx src/bin.ts doctor",
-    "dev:logs": "tsx src/bin.ts logs --lines 50",
     "typecheck": "tsc --noEmit",
     "build": "rm -rf dist && tsc && vite build",
     "start": "node dist/bin.js start",

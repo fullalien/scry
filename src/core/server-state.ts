@@ -7,7 +7,7 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import JSON5 from 'json5';
-import { CONFIG_DIR } from './constants.js';
+import { CONFIG_DIR } from './config/config.constants.js';
 import { logger } from './logger/logger.js';
 
 export type ServerState = {

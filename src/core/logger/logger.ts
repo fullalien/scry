@@ -1,6 +1,6 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { CONFIG_DIR } from '../constants.js';
+import { CONFIG_DIR } from '../config/config.constants.js';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 

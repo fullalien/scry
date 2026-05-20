@@ -16,7 +16,6 @@ Mirror Android device screens in the browser via [scrcpy](https://github.com/Gen
 
 - [Node.js](https://nodejs.org/) >= 20
 - [`adb`](https://developer.android.com/tools/adb) (Android Debug Bridge) in your `PATH`
-- [`scrcpy`](https://github.com/Genymobile/scrcpy) in your `PATH`
 
 ## Installation
 
@@ -66,7 +65,7 @@ List connected ADB devices and their states.
 
 ### `scry doctor`
 
-Run environment checks — verifies that `adb`, `scrcpy`, and the configured port are available.
+Run environment checks — verifies that `adb` and the configured port are available.
 
 ## Configuration
 
@@ -82,9 +81,8 @@ On first run, `scry` uses built-in defaults. To customise behaviour, create `~/.
     path: "adb",       // Path to the adb binary
   },
   scrcpy: {
-    path: "scrcpy",          // Path to the scrcpy binary
     videoBitRate: 4000000,   // Video bit rate in bps (default 4 Mbps)
-    maxSize: 1080,           // Limit the longest dimension (optional)
+    maxSize: 0,              // Limit the longest dimension (0 = no limit)
     maxFps: 60,              // Cap frame rate (optional)
   },
 }
@@ -125,11 +123,8 @@ npm run dev:devices
 
 # Run doctor checks using the local source
 npm run dev:doctor
-
-# Tail recent log lines
-npm run dev:logs
 ```
 
 ## License
 
-MIT
+Apache-2.0
