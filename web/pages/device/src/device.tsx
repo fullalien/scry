@@ -39,7 +39,7 @@ function DeviceApp() {
   const deviceSerial = getDeviceSerialFromUrl();
   const deviceInfo = useDeviceInfo(deviceSerial);
   const [retryKey, setRetryKey] = React.useState(0);
-  const { pageState, streamError, frameSize, wsRef, handleRetry } =
+  const { pageState, streamError, frameSize, fps, wsRef, handleRetry } =
     useDeviceStream(deviceSerial, canvasRef, retryKey);
   const {
     touchPos,
@@ -166,6 +166,7 @@ function DeviceApp() {
             deviceSerial={deviceSerial}
             pageState={pageState as PageState}
             frameSize={frameSize}
+            fps={fps}
             wsRef={wsRef}
             onScreenshot={handleScreenshot}
           />

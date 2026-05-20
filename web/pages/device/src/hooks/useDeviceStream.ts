@@ -14,6 +14,7 @@ export function useDeviceStream(
   pageState: PageState;
   streamError: string | null;
   frameSize: Size | null;
+  fps: number;
   wsRef: React.MutableRefObject<WebSocket | null>;
   handleRetry: () => void;
 } {
@@ -21,10 +22,12 @@ export function useDeviceStream(
   const [pageState, setPageState] = useState<PageState>('loading');
   const [streamError, setStreamError] = useState<string | null>(null);
   const [frameSize, setFrameSize] = useState<Size | null>(null);
+  const [fps, setFps] = useState(0);
 
   const handleRetry = useCallback(() => {
     setStreamError(null);
     setFrameSize(null);
+    setFps(0);
     setPageState('loading');
   }, []);
 
@@ -48,8 +51,15 @@ export function useDeviceStream(
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const frameCounter = { count: 0 };
+    const fpsInterval = setInterval(() => {
+      setFps(frameCounter.count);
+      frameCounter.count = 0;
+    }, 1000);
+
     const decoder = new ScrcpyH264Decoder(
       frame => {
+        frameCounter.count++;
         if (
           canvas.width !== frame.displayWidth ||
           canvas.height !== frame.displayHeight
@@ -125,11 +135,12 @@ export function useDeviceStream(
     return () => {
       cancelled = true;
       clearTimeout(timeout);
+      clearInterval(fpsInterval);
       ws.close();
       wsRef.current = null;
       decoder.close();
     };
   }, [retryKey]);
 
-  return { pageState, streamError, frameSize, wsRef, handleRetry };
+  return { pageState, streamError, frameSize, fps, wsRef, handleRetry };
 }

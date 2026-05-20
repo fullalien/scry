@@ -13,6 +13,7 @@ type DeviceToolbarProps = {
   deviceSerial: string | null;
   pageState: 'loading' | 'streaming' | 'error';
   frameSize: Size | null;
+  fps: number;
   wsRef: React.RefObject<WebSocket | null>;
   onScreenshot: () => void;
 };
@@ -22,6 +23,7 @@ export function DeviceToolbar({
   deviceSerial,
   pageState,
   frameSize,
+  fps,
   wsRef,
   onScreenshot,
 }: DeviceToolbarProps) {
@@ -37,7 +39,7 @@ export function DeviceToolbar({
     frameSize
       ? `${frameSize.width}x${frameSize.height}`
       : deviceInfo?.screenRes || null,
-    deviceInfo?.screenDensity ? `${deviceInfo.screenDensity} dpi` : null,
+    fps > 0 ? `${fps} fps` : null,
   ]
     .filter(Boolean)
     .join('  •  ');
