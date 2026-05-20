@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { APP_NAME } from './core/constants.js';
+import { APP_NAME, APP_VERSION } from './core/constants.js';
 import { registerStartCommand } from './cli/commands/start.js';
 import { registerDevicesCommand } from './cli/commands/devices.js';
 import { registerDoctorCommand } from './cli/commands/doctor.js';
@@ -18,7 +18,7 @@ async function main() {
     console: false,
   });
 
-  program.name(APP_NAME).description('scry CLI').version('0.1.0');
+  program.name(APP_NAME).description('scry CLI').version(APP_VERSION);
 
   registerStartCommand(program, config);
   registerDevicesCommand(program);
