@@ -36,10 +36,10 @@ export function DeviceScreen({
     <div
       className="device-screen-wrapper"
       style={{
-        width: `${(displaySize.width + SCREEN_BORDER_WIDTH * 2) * screenScale}px`,
-        height: `${(displaySize.height + SCREEN_BORDER_WIDTH * 2) * screenScale}px`,
+        width: `${displaySize.width + SCREEN_BORDER_WIDTH * 2}px`,
+        height: `${displaySize.height + SCREEN_BORDER_WIDTH * 2}px`,
         transform: `scale(${screenScale})`,
-        transformOrigin: 'top left',
+        transformOrigin: 'top center',
         cursor: 'none',
       }}
       onMouseMove={onMouseMove}
