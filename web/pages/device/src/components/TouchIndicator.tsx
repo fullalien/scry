@@ -1,3 +1,5 @@
+import './TouchIndicator.css';
+
 type TouchIndicatorProps = {
   x: number;
   y: number;

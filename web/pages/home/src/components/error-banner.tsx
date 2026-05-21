@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertCircle, X } from 'lucide-react';
+import './error-banner.css';
 
 export function ErrorBanner({
   error,

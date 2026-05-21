@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatStreamError } from '../utils/error-formatter';
+import './DeviceErrorOverlay.css';
 
 type DeviceErrorOverlayProps = {
   streamError: string;

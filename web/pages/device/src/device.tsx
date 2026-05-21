@@ -24,7 +24,6 @@ import { DeviceErrorOverlay } from './components/DeviceErrorOverlay.js';
 import { TouchIndicator } from './components/TouchIndicator.js';
 import { Spinner } from '../../../components/spinner.js';
 import './device.css';
-
 function DeviceApp() {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const ctxRef = React.useRef<CanvasRenderingContext2D | null>(null);

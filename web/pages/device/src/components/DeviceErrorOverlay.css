@@ -1,0 +1,54 @@
+.device-error-float {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  max-width: calc(100vw - 40px);
+  border-radius: 999px;
+  padding: 8px 12px 8px 16px;
+  height: auto;
+  min-height: 36px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: #ffd7d7;
+  background: linear-gradient(180deg, rgb(136 28 34), rgb(109 18 24));
+  border: 1px solid rgb(255 122 122 / 45%);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 10%) inset,
+    0 6px 16px rgb(18 26 40 / 12%);
+  word-break: break-word;
+  white-space: normal;
+  z-index: 5;
+}
+
+.device-error-float span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.device-error-retry {
+  flex-shrink: 0;
+  height: 24px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgb(136 28 34);
+  background: rgb(255 215 215 / 90%);
+  border: none;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.device-error-retry:hover {
+  background: rgb(255 255 255);
+}
+
+.device-error-retry:active {
+  background: rgb(230 230 230);
+}

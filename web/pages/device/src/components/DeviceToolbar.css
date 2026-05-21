@@ -1,0 +1,93 @@
+.device-toolbar {
+  height: 52px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgb(241 244 248), rgb(226 232 240));
+  color: #13171d;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  gap: 24px;
+  border: 1px solid rgb(16 20 30 / 10%);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 80%) inset,
+    0 10px 24px rgb(18 26 40 / 15%);
+}
+
+.toolbar-left {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.toolbar-title {
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: 640;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toolbar-meta {
+  font-size: 10px;
+  color: rgb(66 71 81);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.toolbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 14px;
+  background: rgb(16 20 30 / 12%);
+  flex-shrink: 0;
+}
+
+.toolbar-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  transition: background 120ms ease;
+}
+
+.toolbar-btn img {
+  width: 20px;
+  height: 20px;
+  filter: brightness(0) saturate(100%) invert(24%) sepia(8%) saturate(400%)
+    hue-rotate(175deg) brightness(95%) contrast(88%);
+}
+
+.toolbar-btn:hover {
+  background: rgb(0 0 0 / 8%);
+}
+
+.toolbar-btn:active {
+  background: rgb(0 0 0 / 14%);
+}
+
+@media (max-width: 400px) {
+  .device-toolbar {
+    padding: 6px 10px;
+    max-width: 95vw;
+  }
+}

@@ -7,6 +7,7 @@ import recentIcon from '../../../../assets/icon/sysbar_recent.svg';
 import screenShotIcon from '../../../../assets/icon/ic_screenshot.svg';
 import type { AdbDevice } from '../hooks/useDeviceInfo';
 import type { Size } from '../utils/resolution';
+import './DeviceToolbar.css';
 
 type DeviceToolbarProps = {
   deviceInfo: AdbDevice | null;

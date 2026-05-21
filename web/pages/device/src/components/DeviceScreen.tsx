@@ -5,6 +5,7 @@ import { toCssInchPixels, parseDensity, type Size } from '../utils/resolution';
 import type { AdbDevice } from '../hooks/useDeviceInfo';
 import type { PageState } from '../hooks/useDeviceStream';
 import { Spinner } from '../../../../components/spinner';
+import './DeviceScreen.css';
 
 type DeviceScreenProps = {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;

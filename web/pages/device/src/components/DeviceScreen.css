@@ -1,0 +1,36 @@
+.device-screen-wrapper {
+  filter: drop-shadow(0 1px 6px rgb(0 0 0 / 15%))
+    drop-shadow(0 4px 12px rgb(0 0 0 / 20%))
+    drop-shadow(0 8px 20px rgb(0 0 0 / 12%));
+}
+
+.device-screen {
+  position: relative;
+  overflow: hidden;
+  background: black;
+}
+
+.device-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: black;
+}
+
+.device-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgb(219 223 231);
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  background: radial-gradient(circle at 50% 20%, rgb(22 26 34), rgb(10 12 19));
+}
+
+.placeholder-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}

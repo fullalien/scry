@@ -39,6 +39,15 @@ body {
   transition: opacity 200ms ease;
 }
 
+.device-stack {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  transform-origin: center center;
+}
+
 .device-loader {
   position: fixed;
   inset: 0;
@@ -50,225 +59,8 @@ body {
   z-index: 10;
 }
 
-.device-stack {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 24px;
-  transform-origin: center center;
-}
-
-.device-toolbar {
-  height: 52px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, rgb(241 244 248), rgb(226 232 240));
-  color: #13171d;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 16px;
-  gap: 24px;
-  border: 1px solid rgb(16 20 30 / 10%);
-  box-shadow:
-    0 1px 0 rgb(255 255 255 / 80%) inset,
-    0 10px 24px rgb(18 26 40 / 15%);
-}
-
-.toolbar-left {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.toolbar-title {
-  font-size: 14px;
-  line-height: 1.2;
-  font-weight: 640;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.toolbar-meta {
-  font-size: 10px;
-  color: rgb(66 71 81);
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-.toolbar-nav {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.toolbar-divider {
-  width: 1px;
-  height: 14px;
-  background: rgb(16 20 30 / 12%);
-  flex-shrink: 0;
-}
-
-.toolbar-btn {
-  width: 28px;
-  height: 28px;
-  display: inline-grid;
-  place-items: center;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-  background: transparent;
-  transition: background 120ms ease;
-}
-
-.toolbar-btn img {
-  width: 20px;
-  height: 20px;
-  filter: brightness(0) saturate(100%) invert(24%) sepia(8%) saturate(400%)
-    hue-rotate(175deg) brightness(95%) contrast(88%);
-}
-
-.toolbar-btn:hover {
-  background: rgb(0 0 0 / 8%);
-}
-
-.toolbar-btn:active {
-  background: rgb(0 0 0 / 14%);
-}
-
-.device-screen-wrapper {
-  filter: drop-shadow(0 1px 6px rgb(0 0 0 / 15%))
-    drop-shadow(0 4px 12px rgb(0 0 0 / 20%))
-    drop-shadow(0 8px 20px rgb(0 0 0 / 12%));
-}
-
-.device-screen {
-  position: relative;
-  overflow: hidden;
-  background: black;
-}
-
-.device-canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-  background: black;
-}
-
-.device-placeholder {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: rgb(219 223 231);
-  font-size: 14px;
-  letter-spacing: 0.01em;
-  background: radial-gradient(circle at 50% 20%, rgb(22 26 34), rgb(10 12 19));
-}
-
-.placeholder-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.device-error-float {
-  position: absolute;
-  top: -12px;
-  left: 50%;
-  transform: translate(-50%, -100%);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: max-content;
-  max-width: calc(100vw - 40px);
-  border-radius: 999px;
-  padding: 8px 12px 8px 16px;
-  height: auto;
-  min-height: 36px;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1.4;
-  color: #ffd7d7;
-  background: linear-gradient(180deg, rgb(136 28 34), rgb(109 18 24));
-  border: 1px solid rgb(255 122 122 / 45%);
-  box-shadow:
-    0 1px 0 rgb(255 255 255 / 10%) inset,
-    0 6px 16px rgb(18 26 40 / 12%);
-  word-break: break-word;
-  white-space: normal;
-  z-index: 5;
-}
-
-.device-error-float span {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.device-error-retry {
-  flex-shrink: 0;
-  height: 24px;
-  padding: 0 12px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  color: rgb(136 28 34);
-  background: rgb(255 215 215 / 90%);
-  border: none;
-  cursor: pointer;
-  transition: background 120ms ease;
-}
-
-.device-error-retry:hover {
-  background: rgb(255 255 255);
-}
-
-.device-error-retry:active {
-  background: rgb(230 230 230);
-}
-
-.touch-indicator {
-  position: fixed;
-  width: 20px;
-  height: 20px;
-  margin-left: -10px;
-  margin-top: -10px;
-  border-radius: 50%;
-  background: rgb(255 255 255 / 35%);
-  border: 1.5px solid rgb(255 255 255 / 60%);
-  pointer-events: none;
-  box-shadow: 0 0 6px rgb(0 0 0 / 20%);
-  z-index: 999;
-  transition:
-    transform 80ms ease,
-    background 80ms ease,
-    box-shadow 80ms ease;
-}
-
-.touch-indicator[data-pressed] {
-  transform: scale(0.75);
-  background: rgb(255 255 255 / 55%);
-  box-shadow: 0 0 12px rgb(0 0 0 / 30%);
-}
-
 @media (max-width: 900px) {
   .device-stage {
     padding: 14px;
-  }
-
-  .device-toolbar {
-    padding: 6px 10px;
-    max-width: 95vw;
   }
 }
