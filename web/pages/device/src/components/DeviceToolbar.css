@@ -77,12 +77,52 @@
     hue-rotate(175deg) brightness(95%) contrast(88%);
 }
 
+.toolbar-btn svg {
+  width: 18px;
+  height: 18px;
+  color: #4b5563;
+}
+
 .toolbar-btn:hover {
   background: rgb(0 0 0 / 8%);
 }
 
 .toolbar-btn:active {
   background: rgb(0 0 0 / 14%);
+}
+
+:root.dark .device-toolbar {
+  background: linear-gradient(180deg, rgb(38 42 51), rgb(30 34 42));
+  color: #e8ecf1;
+  border-color: rgb(255 255 255 / 8%);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 5%) inset,
+    0 10px 24px rgb(0 0 0 / 30%);
+}
+
+:root.dark .toolbar-meta {
+  color: rgb(156 163 175);
+}
+
+:root.dark .toolbar-divider {
+  background: rgb(255 255 255 / 10%);
+}
+
+:root.dark .toolbar-btn img {
+  filter: brightness(0) saturate(100%) invert(85%) sepia(5%) saturate(300%)
+    hue-rotate(175deg) brightness(95%) contrast(88%);
+}
+
+:root.dark .toolbar-btn svg {
+  color: #d1d5db;
+}
+
+:root.dark .toolbar-btn:hover {
+  background: rgb(255 255 255 / 8%);
+}
+
+:root.dark .toolbar-btn:active {
+  background: rgb(255 255 255 / 14%);
 }
 
 @media (max-width: 400px) {

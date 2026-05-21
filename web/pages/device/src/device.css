@@ -1,7 +1,21 @@
 @import 'tailwindcss';
 
+@variant dark (&:where(.dark, .dark *));
+
 :root {
   color-scheme: light;
+  --bg-gradient-1: rgb(240 243 247 / 95%);
+  --bg-gradient-2: rgb(217 224 235 / 92%);
+  --bg-primary: linear-gradient(165deg, #e3e6ec, #d9dde5 48%, #d3d9e2);
+  --screen-border-color: black;
+}
+
+:root.dark {
+  color-scheme: dark;
+  --bg-gradient-1: rgb(30 35 45 / 95%);
+  --bg-gradient-2: rgb(25 30 40 / 92%);
+  --bg-primary: linear-gradient(165deg, #1a1d23, #151820 48%, #111419);
+  --screen-border-color: rgb(60 65 75);
 }
 
 * {
@@ -18,9 +32,9 @@ body,
 
 body {
   background:
-    radial-gradient(circle at 16% 12%, rgb(240 243 247 / 95%), transparent 45%),
-    radial-gradient(circle at 88% 4%, rgb(217 224 235 / 92%), transparent 55%),
-    linear-gradient(165deg, #e3e6ec, #d9dde5 48%, #d3d9e2);
+    radial-gradient(circle at 16% 12%, var(--bg-gradient-1), transparent 45%),
+    radial-gradient(circle at 88% 4%, var(--bg-gradient-2), transparent 55%),
+    var(--bg-primary);
 }
 
 .device-page {
@@ -63,4 +77,40 @@ body {
   .device-stage {
     padding: 14px;
   }
+}
+
+.theme-toggle-btn {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 100;
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 8px;
+  border: 1px solid rgb(16 20 30 / 10%);
+  background: rgb(255 255 255 / 80%);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  color: #4b5563;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
+  transition: all 120ms ease;
+}
+
+.theme-toggle-btn:hover {
+  background: rgb(255 255 255);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
+}
+
+:root.dark .theme-toggle-btn {
+  background: rgb(30 34 42 / 80%);
+  border-color: rgb(255 255 255 / 8%);
+  color: #d1d5db;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 30%);
+}
+
+:root.dark .theme-toggle-btn:hover {
+  background: rgb(38 42 51);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 40%);
 }

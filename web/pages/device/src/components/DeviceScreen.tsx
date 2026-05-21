@@ -38,7 +38,7 @@ export function DeviceScreen({
       className="device-screen-wrapper"
       style={{
         width: `${displaySize.width + SCREEN_BORDER_WIDTH * 2}px`,
-        height: `${displaySize.height + SCREEN_BORDER_WIDTH * 2}px`,
+        height: `${(displaySize.height + SCREEN_BORDER_WIDTH * 2) * screenScale}px`,
         transform: `scale(${screenScale})`,
         transformOrigin: 'top center',
         cursor: 'none',
@@ -56,7 +56,7 @@ export function DeviceScreen({
         cornerSmoothing={0.8}
         style={{
           padding: `${SCREEN_BORDER_WIDTH}px`,
-          background: 'black',
+          background: 'var(--screen-border-color, black)',
         }}
       >
         <Squircle cornerRadius={screenCornerRadius} cornerSmoothing={0.8}>

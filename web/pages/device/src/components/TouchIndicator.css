@@ -21,3 +21,14 @@
   background: rgb(255 255 255 / 55%);
   box-shadow: 0 0 12px rgb(0 0 0 / 30%);
 }
+
+:root.dark .touch-indicator {
+  background: rgb(255 255 255 / 20%);
+  border-color: rgb(255 255 255 / 40%);
+  box-shadow: 0 0 6px rgb(0 0 0 / 40%);
+}
+
+:root.dark .touch-indicator[data-pressed] {
+  background: rgb(255 255 255 / 35%);
+  box-shadow: 0 0 12px rgb(0 0 0 / 50%);
+}

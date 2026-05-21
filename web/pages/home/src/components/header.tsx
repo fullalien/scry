@@ -1,15 +1,22 @@
 import React from 'react';
-import { Smartphone, RefreshCw } from 'lucide-react';
+import { Smartphone, RefreshCw, Sun, Moon, Monitor } from 'lucide-react';
 
 export function Header({
   deviceCount,
   refreshing,
   onRefresh,
+  theme,
+  onToggleTheme,
 }: {
   deviceCount: number;
   refreshing: boolean;
   onRefresh: () => void;
+  theme: 'light' | 'dark' | 'system';
+  onToggleTheme: () => void;
 }) {
+  const themeIcon = theme === 'system' ? <Monitor size={14} /> : theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />;
+  const themeLabel = theme === 'system' ? 'System' : theme === 'dark' ? 'Dark' : 'Light';
+
   return (
     <header className="mb-6">
       <div className="flex items-center justify-between">
@@ -18,29 +25,39 @@ export function Header({
             <Smartphone size={20} />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Scry</h1>
-            <p className="text-xs text-gray-500">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-[#e8ecf1]">Scry</h1>
+            <p className="text-xs text-gray-500 dark:text-[#9ca3af]">
               Web Screen Mirror
               {deviceCount > 0 && (
-                <span className="ml-1.5 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                <span className="ml-1.5 inline-flex items-center rounded-full bg-gray-100 dark:bg-[#262a33] px-2 py-0.5 text-xs font-medium text-gray-600 dark:text-[#9ca3af]">
                   {deviceCount} {deviceCount === 1 ? 'device' : 'devices'}
                 </span>
               )}
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50 hover:shadow disabled:opacity-50"
-          onClick={onRefresh}
-          disabled={refreshing}
-        >
-          <RefreshCw
-            size={14}
-            className={refreshing ? 'animate-spin' : ''}
-          />
-          {refreshing ? 'Refreshing...' : 'Refresh'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="inline-flex items-center justify-center rounded-lg border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-[#1e222a] p-2 text-gray-600 dark:text-[#d1d5db] shadow-sm transition-all hover:bg-gray-50 dark:hover:bg-white/[0.08] hover:shadow disabled:opacity-50"
+            onClick={onRefresh}
+            disabled={refreshing}
+            aria-label="Refresh"
+          >
+            <RefreshCw
+              size={14}
+              className={refreshing ? 'animate-spin' : ''}
+            />
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center justify-center rounded-lg border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-[#1e222a] p-2 text-gray-600 dark:text-[#d1d5db] shadow-sm transition-all hover:bg-gray-50 dark:hover:bg-white/[0.08] hover:shadow disabled:opacity-50"
+            onClick={onToggleTheme}
+            aria-label={`Theme: ${themeLabel}`}
+          >
+            {themeIcon}
+          </button>
+        </div>
       </div>
     </header>
   );

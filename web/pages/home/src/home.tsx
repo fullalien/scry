@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { useAppData } from './hooks/use-app-data.js';
+import { useTheme } from '../../../hooks/useTheme.js';
 import { ErrorBanner } from './components/error-banner.js';
 import { Header } from './components/header.js';
 import { DeviceList } from './components/device-list.js';
@@ -10,6 +11,7 @@ import './home.css';
 
 function App() {
   const { data, loading, error, refreshing, refresh, setError } = useAppData();
+  const { theme, toggleTheme } = useTheme();
 
   const { devices, scrcpySessions, devicesOk } = data ?? {
     devices: [] as import('./types.js').AdbDevice[],
@@ -18,7 +20,7 @@ function App() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6 font-sans">
+    <main className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-[#1a1d23] dark:to-[#111419] p-6 font-sans">
       <div className="mx-auto max-w-2xl">
         <ErrorBanner error={error} onDismiss={() => setError(null)} />
 
@@ -26,6 +28,8 @@ function App() {
           deviceCount={devices.length}
           refreshing={refreshing}
           onRefresh={refresh}
+          theme={theme}
+          onToggleTheme={toggleTheme}
         />
 
         <section>

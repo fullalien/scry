@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { Sun, Moon, Monitor } from 'lucide-react';
 import {
   parseResolution,
   parseDensity,
@@ -18,6 +19,7 @@ import { useDeviceInfo } from './hooks/useDeviceInfo.js';
 import { useDeviceStream, type PageState } from './hooks/useDeviceStream.js';
 import { useTouchInput } from './hooks/useTouchInput.js';
 import { useKeyboardInput } from './hooks/useKeyboardInput.js';
+import { useTheme } from '../../../hooks/useTheme.js';
 import { DeviceToolbar } from './components/DeviceToolbar.js';
 import { DeviceScreen } from './components/DeviceScreen.js';
 import { DeviceErrorOverlay } from './components/DeviceErrorOverlay.js';
@@ -27,6 +29,7 @@ import './device.css';
 function DeviceApp() {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const ctxRef = React.useRef<CanvasRenderingContext2D | null>(null);
+  const { theme, toggleTheme } = useTheme();
 
   React.useEffect(() => {
     const canvas = canvasRef.current;
@@ -144,6 +147,14 @@ function DeviceApp() {
 
   return (
     <main className="device-page">
+      <button
+        type="button"
+        className="theme-toggle-btn"
+        aria-label={`Theme: ${theme}`}
+        onClick={toggleTheme}
+      >
+        {theme === 'system' ? <Monitor size={14} strokeWidth={2} /> : theme === 'dark' ? <Sun size={14} strokeWidth={2} /> : <Moon size={14} strokeWidth={2} />}
+      </button>
       {pageState === 'loading' && (
         <div className="device-loader" role="status" aria-live="polite">
           <Spinner name="waverows" />
