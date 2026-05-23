@@ -18,7 +18,10 @@ async function main() {
     console: false,
   });
 
-  program.name(APP_NAME).description('scry CLI').version(APP_VERSION);
+  program
+    .name(APP_NAME)
+    .description('Mirror Android screens in the browser')
+    .version(APP_VERSION);
 
   registerStartCommand(program, config);
   registerDevicesCommand(program);

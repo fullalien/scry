@@ -1,8 +1,9 @@
 # scry
 
-Mirror Android device screens in the browser via [scrcpy](https://github.com/Genymobile/scrcpy).
+Mirror Android device screens in the browser via a bundled [scrcpy-server](https://github.com/Genymobile/scrcpy) runtime.
 
 `scry` runs a local web server that streams your Android device's screen over WebSocket, rendered on an HTML canvas with touch and keyboard input forwarding.
+It depends on the bundled scrcpy-server jar and does not require installing the `scrcpy` desktop app on your machine.
 
 ## Features
 
@@ -20,7 +21,7 @@ Mirror Android device screens in the browser via [scrcpy](https://github.com/Gen
 ## Installation
 
 ```sh
-npm install -g scry
+npm install -g @fullalien/scry
 ```
 
 ## Quick Start
@@ -41,31 +42,25 @@ scry start
 scry <command> [options]
 ```
 
-### `scry start`
+```sh
+# Start server (background daemon by default)
+scry start
 
-Start the scry server as a background daemon.
+# Start server in foreground and override bind address/port
+scry start --foreground --host 127.0.0.1 --port 8080
 
-| Option        | Default       | Description                       |
-| ------------- | ------------- | --------------------------------- |
-| `--host`      | `127.0.0.1`   | Host address to listen on         |
-| `--port`      | `8080`        | Port to listen on                 |
-| `--foreground`| `false`       | Run in the foreground (no daemon) |
+# Stop running server
+scry stop
 
-### `scry stop`
+# Show server status (PID/address/start time)
+scry status
 
-Stop the running server.
+# List connected adb devices
+scry devices
 
-### `scry status`
-
-Show whether the server is running, its address, PID, and start time.
-
-### `scry devices`
-
-List connected ADB devices and their states.
-
-### `scry doctor`
-
-Run environment checks — verifies that `adb` and the configured port are available.
+# Check environment (adb + port availability)
+scry doctor
+```
 
 ## Configuration
 
@@ -102,8 +97,11 @@ On first run, `scry` uses built-in defaults. To customise behaviour, create `~/.
 # Install dependencies
 npm install
 
-# Run backend (TypeScript watch) and frontend (Vite watch) concurrently
+# Rebuild backend (TypeScript watch) and frontend bundle (Vite watch)
 npm run dev
+
+# In another terminal, start the local CLI/server
+npm run start
 
 # Type-check
 npm run typecheck
