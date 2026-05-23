@@ -35,4 +35,4 @@ jobs:
           node -e 'const v=process.argv[1]; if(!/^\d+\.\d+\.\d+([.-].+)?$/.test(v)){console.error(`Invalid version: ${v}`); process.exit(1)}' "${VERSION}"
           npm version --no-git-tag-version "${VERSION}"
       - name: Publish to npm
-        run: npm publish --provenance
+        run: npm publish --provenance --access public
