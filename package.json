@@ -49,6 +49,7 @@
     "@types/node": "^22.15.30",
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.5",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.5.1",
     "concurrently": "^9.1.2",
     "postcss": "^8.5.14",

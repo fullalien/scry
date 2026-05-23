@@ -52,6 +52,15 @@ export async function createServer(options: ServerOptions) {
   return app;
 }
 
+const cachedDeviceHtml = fs.readFileSync(
+  path.join(projectRoot, 'dist', 'web', 'pages', 'device', 'index.html'),
+  'utf8'
+);
+const cachedHomeHtml = fs.readFileSync(
+  path.join(projectRoot, 'dist', 'web', 'pages', 'home', 'index.html'),
+  'utf8'
+);
+
 async function registerViteFastify(app: FastifyInstance): Promise<void> {
   const webDir = path.join(projectRoot, 'dist', 'web');
   if (!fs.existsSync(webDir)) {
@@ -64,21 +73,21 @@ async function registerViteFastify(app: FastifyInstance): Promise<void> {
     decorateReply: false,
   });
 
-  const deviceHtml = fs.readFileSync(
-    path.join(webDir, 'pages', 'device', 'index.html'),
-    'utf8'
-  );
-  const homeHtml = fs.readFileSync(
-    path.join(webDir, 'pages', 'home', 'index.html'),
-    'utf8'
-  );
+  const deviceHtmlPath = path.join(webDir, 'pages', 'device', 'index.html');
+  const homeHtmlPath = path.join(webDir, 'pages', 'home', 'index.html');
+
+  const isDev = process.env['NODE_ENV'] !== 'production';
 
   app.get('/device/*', async (_request, reply) => {
-    return reply.type('text/html').send(deviceHtml);
+    const html = isDev
+      ? fs.readFileSync(deviceHtmlPath, 'utf8')
+      : cachedDeviceHtml;
+    return reply.type('text/html').send(html);
   });
 
   app.get('/*', async (_request, reply) => {
-    return reply.type('text/html').send(homeHtml);
+    const html = isDev ? fs.readFileSync(homeHtmlPath, 'utf8') : cachedHomeHtml;
+    return reply.type('text/html').send(html);
   });
 }
 
