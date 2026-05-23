@@ -2,6 +2,11 @@ name: Publish Package
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: Optional publish version (for example 0.1.2 or v0.1.2)
+        required: false
+        type: string
   release:
     types:
       - published
@@ -28,16 +33,29 @@ jobs:
         run: npm run build
       - name: Resolve publish version
         env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
           TAG_NAME: ${{ github.event.release.tag_name }}
         run: |
-          VERSION="${TAG_NAME#v}"
-          if [ -z "${VERSION}" ]; then
-            VERSION="$(npm pkg get version | tr -d '"')"
-            echo "release tag: <none>"
-            echo "fallback to package.json version"
+          VERSION="${INPUT_VERSION#v}"
+
+          if [ -n "${VERSION}" ]; then
+            echo "version source: workflow input"
           else
+            VERSION="${TAG_NAME#v}"
+          fi
+
+          if [ -n "${VERSION}" ] && [ -z "${INPUT_VERSION}" ]; then
+            echo "version source: release tag"
             echo "release tag: ${TAG_NAME}"
           fi
+
+          if [ -z "${VERSION}" ]; then
+            VERSION="$(npm pkg get version | tr -d '"')"
+            echo "version source: package.json"
+            echo "release tag: <none>"
+            echo "fallback to package.json version"
+          fi
+
           echo "publish version: ${VERSION}"
           node -e 'const v=process.argv[1]; if(!/^\d+\.\d+\.\d+([.-].+)?$/.test(v)){console.error(`Invalid version: ${v}`); process.exit(1)}' "${VERSION}"
           npm version --no-git-tag-version "${VERSION}"
