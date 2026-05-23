@@ -1,11 +1,14 @@
 {
-  "name": "scry",
+  "name": "@fullalien/scry",
   "version": "0.1.0",
   "type": "module",
   "license": "Apache-2.0",
   "author": {
     "name": "Van Bai",
     "email": "baifanf@hotmail.com"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "bin": {
     "scry": "dist/bin.js"

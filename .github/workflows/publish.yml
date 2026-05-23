@@ -1,0 +1,38 @@
+name: Publish Package
+
+on:
+  release:
+    types:
+      - published
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: "https://registry.npmjs.org"
+      - name: Install dependencies
+        run: npm ci
+      - name: Type check
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+      - name: Set version from release tag
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="${TAG_NAME#v}"
+          echo "release tag: ${TAG_NAME}"
+          echo "publish version: ${VERSION}"
+          node -e 'const v=process.argv[1]; if(!/^\d+\.\d+\.\d+([.-].+)?$/.test(v)){console.error(`Invalid version: ${v}`); process.exit(1)}' "${VERSION}"
+          npm version --no-git-tag-version "${VERSION}"
+      - name: Publish to npm
+        run: npm publish --provenance
