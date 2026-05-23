@@ -26,12 +26,18 @@ jobs:
         run: npm run typecheck
       - name: Build
         run: npm run build
-      - name: Set version from release tag
+      - name: Resolve publish version
         env:
           TAG_NAME: ${{ github.event.release.tag_name }}
         run: |
           VERSION="${TAG_NAME#v}"
-          echo "release tag: ${TAG_NAME}"
+          if [ -z "${VERSION}" ]; then
+            VERSION="$(npm pkg get version | tr -d '"')"
+            echo "release tag: <none>"
+            echo "fallback to package.json version"
+          else
+            echo "release tag: ${TAG_NAME}"
+          fi
           echo "publish version: ${VERSION}"
           node -e 'const v=process.argv[1]; if(!/^\d+\.\d+\.\d+([.-].+)?$/.test(v)){console.error(`Invalid version: ${v}`); process.exit(1)}' "${VERSION}"
           npm version --no-git-tag-version "${VERSION}"
