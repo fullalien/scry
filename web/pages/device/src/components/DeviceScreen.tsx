@@ -72,10 +72,7 @@ export function DeviceScreen({
         }}
       >
         <Squircle cornerRadius={screenCornerRadius} cornerSmoothing={0.8}>
-          <div
-            ref={screenRef}
-            className="device-screen"
-          >
+          <div ref={screenRef} className="device-screen">
             <canvas ref={canvasRef} className="device-canvas" />
             {pageState === 'loading' && (
               <div className="device-placeholder">

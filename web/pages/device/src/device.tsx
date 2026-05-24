@@ -44,13 +44,7 @@ function DeviceApp() {
   const deviceSerial = getDeviceSerialFromUrl();
   const deviceInfo = useDeviceInfo(deviceSerial);
   const [retryKey, setRetryKey] = React.useState(0);
-  const {
-    pageState,
-    streamError,
-    frameSize,
-    fps,
-    handleRetry,
-  } =
+  const { pageState, streamError, frameSize, fps, handleRetry } =
     useDeviceStream(deviceSerial, canvasRef, retryKey);
 
   const { controlWsRef, deviceMessageEvent } = useDeviceControl(
@@ -172,7 +166,13 @@ function DeviceApp() {
         aria-label={`Theme: ${theme}`}
         onClick={toggleTheme}
       >
-        {theme === 'system' ? <Monitor size={14} strokeWidth={2} /> : theme === 'dark' ? <Sun size={14} strokeWidth={2} /> : <Moon size={14} strokeWidth={2} />}
+        {theme === 'system' ? (
+          <Monitor size={14} strokeWidth={2} />
+        ) : theme === 'dark' ? (
+          <Sun size={14} strokeWidth={2} />
+        ) : (
+          <Moon size={14} strokeWidth={2} />
+        )}
       </button>
       {pageState === 'loading' && (
         <div className="device-loader" role="status" aria-live="polite">

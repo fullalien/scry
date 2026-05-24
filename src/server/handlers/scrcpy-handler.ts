@@ -414,8 +414,7 @@ export const scrcpyDeviceStream =
   };
 
 export const scrcpyDeviceControl =
-  (scrcpyManager: ScrcpyManager) =>
-  (socket: any, request: FastifyRequest) => {
+  (scrcpyManager: ScrcpyManager) => (socket: any, request: FastifyRequest) => {
     const { deviceSerial } = request.params as { deviceSerial: string };
 
     if (

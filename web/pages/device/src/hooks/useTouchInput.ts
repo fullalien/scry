@@ -266,10 +266,18 @@ export function useTouchInput(
         setSecondaryTouchPos(null);
       }
       if (touchPosRef.current?.pressed) {
-        sendTouchAction(TouchAction.UP, touchPosRef.current.x, touchPosRef.current.y);
+        sendTouchAction(
+          TouchAction.UP,
+          touchPosRef.current.x,
+          touchPosRef.current.y
+        );
       }
     } else if (touchPosRef.current?.pressed) {
-      sendTouchAction(TouchAction.UP, touchPosRef.current.x, touchPosRef.current.y);
+      sendTouchAction(
+        TouchAction.UP,
+        touchPosRef.current.x,
+        touchPosRef.current.y
+      );
     }
     setTouchPos(null);
     isMultiTouchRef.current = false;

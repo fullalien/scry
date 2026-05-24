@@ -1,7 +1,10 @@
 import net from 'node:net';
 import getPort from 'get-port';
 
-export async function isPortAvailable(host: string, port: number): Promise<boolean> {
+export async function isPortAvailable(
+  defaultPort: number,
+  host: string = '127.0.0.1'
+): Promise<boolean> {
   return new Promise(resolve => {
     const server = net.createServer();
 
@@ -15,7 +18,7 @@ export async function isPortAvailable(host: string, port: number): Promise<boole
 
     // some platforms require host to be omitted for wildcard binds
     try {
-      server.listen(port, host);
+      server.listen(defaultPort, host);
     } catch (e) {
       resolve(false);
     }
@@ -27,13 +30,13 @@ export async function isPortAvailable(host: string, port: number): Promise<boole
  * and return an available port.
  */
 export async function getAvailablePort(
-  host: string,
-  preferredPort: number
+  defaultPort: number,
+  host: string = '127.0.0.1'
 ): Promise<number> {
-  if (await isPortAvailable(host, preferredPort)) return preferredPort;
+  if (await isPortAvailable(defaultPort, host)) return defaultPort;
   // Ask get-port to try the preferred port first; it will return an available
   // port if the preferred one is occupied.
-  return getPort({ port: preferredPort });
+  return getPort({ port: defaultPort });
 }
 
 export default getAvailablePort;

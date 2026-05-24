@@ -69,27 +69,27 @@ On first run, `scry` uses built-in defaults. To customise behaviour, create `~/.
 ```json5
 {
   server: {
-    host: "127.0.0.1", // Interface to bind
-    port: 8080,        // Port to listen on
+    host: '127.0.0.1', // Interface to bind
+    port: 8080, // Port to listen on
   },
   adb: {
-    path: "adb",       // Path to the adb binary
+    path: 'adb', // Path to the adb binary
   },
   scrcpy: {
-    videoBitRate: 4000000,   // Video bit rate in bps (default 4 Mbps)
-    maxSize: 0,              // Limit the longest dimension (0 = no limit)
-    maxFps: 60,              // Cap frame rate (optional)
+    videoBitRate: 4000000, // Video bit rate in bps (default 4 Mbps)
+    maxSize: 0, // Limit the longest dimension (0 = no limit)
+    maxFps: 60, // Cap frame rate (optional)
   },
 }
 ```
 
 ### Environment Variables
 
-| Variable              | Description                              |
-| --------------------- | ---------------------------------------- |
-| `SCRCPY_WEB_HOST`     | Override `server.host` from config       |
-| `SCRCPY_WEB_PORT`     | Override `server.port` from config       |
-| `SCRCPY_WEB_ADB_PATH` | Override `adb.path` from config          |
+| Variable              | Description                        |
+| --------------------- | ---------------------------------- |
+| `SCRCPY_WEB_HOST`     | Override `server.host` from config |
+| `SCRCPY_WEB_PORT`     | Override `server.port` from config |
+| `SCRCPY_WEB_ADB_PATH` | Override `adb.path` from config    |
 
 ## Development
 

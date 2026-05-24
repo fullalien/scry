@@ -18,6 +18,7 @@ import {
   adbForwardRemove,
   adbShellSpawn,
 } from '../adb/adb-client.js';
+import { getAvailablePort } from '../net/port.js';
 import { getServerJarPath, SERVER_VERSION } from './server-jar.js';
 import { logger } from '../logger/logger.js';
 import {
@@ -170,6 +171,7 @@ export class ScrcpyServer extends EventEmitter {
   private controlReader?: SocketReader;
   private audioSocket?: net.Socket;
   private audioReader?: SocketReader;
+  private forwardPort: number = SCRCPY_FORWARD_PORT;
 
   private shellProcess!: ChildProcess;
   private _running = false;
@@ -243,18 +245,29 @@ export class ScrcpyServer extends EventEmitter {
     }
 
     // 3. Kill any stale scrcpy-server process on the device to avoid socket conflicts
-    await adbShell(
-      options.deviceSerial,
-      'pkill -f com.genymobile.scrcpy.Server 2>/dev/null; true'
-    ).catch(err => {
-      logger.warn('[ScrcpyServer] Failed to kill stale server process', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-    });
+    // NOTE: Do NOT kill device-side processes here. Instead, prefer using a
+    // different local forward port if the default is occupied.
 
-    // 4. Set up port forward (remove any stale forward first)
-    await adbForwardRemove(options.deviceSerial, SCRCPY_FORWARD_PORT);
-    await adbForward(options.deviceSerial, SCRCPY_FORWARD_PORT, socketName);
+    // 4. Choose an available local TCP port and adb forward to that port.
+    try {
+      this.forwardPort = await getAvailablePort(SCRCPY_FORWARD_PORT);
+      if (this.forwardPort !== SCRCPY_FORWARD_PORT) {
+        logger.warn(
+          `[ScrcpyServer] Default forward port ${SCRCPY_FORWARD_PORT} is in use, using available port ${this.forwardPort} instead.`
+        );
+      }
+    } catch (err) {
+      logger.error(
+        '[ScrcpyServer] Failed to find available port for adb forward',
+        {
+          error: err instanceof Error ? err.message : String(err),
+        }
+      );
+      throw err;
+    }
+
+    await adbForwardRemove(options.deviceSerial, this.forwardPort);
+    await adbForward(options.deviceSerial, this.forwardPort, socketName);
 
     // 5. Launch the scrcpy Java server (runs indefinitely — do NOT await)
     try {
@@ -340,7 +353,7 @@ export class ScrcpyServer extends EventEmitter {
   }
 
   private async connectAndHandshake(socketName: string): Promise<void> {
-    this.videoSocket = await tcpConnectWithRetry(SCRCPY_FORWARD_PORT);
+    this.videoSocket = await tcpConnectWithRetry(this.forwardPort);
     this.videoReader = new SocketReader(this.videoSocket);
 
     // should connect control before reading video data
@@ -354,7 +367,7 @@ export class ScrcpyServer extends EventEmitter {
     // should connect audio before reading video data
     if (this.audioEnabled) {
       logger.info('[ScrcpyServer] Audio enabled, connecting to audio socket…');
-      this.audioSocket = await tcpConnectWithRetry(SCRCPY_FORWARD_PORT);
+      this.audioSocket = await tcpConnectWithRetry(this.forwardPort);
       this.audioReader = new SocketReader(this.audioSocket);
     }
 
@@ -414,7 +427,7 @@ export class ScrcpyServer extends EventEmitter {
 
   private async connectControlSocket(): Promise<void> {
     try {
-      this.controlSocket = await tcpConnectWithRetry(SCRCPY_FORWARD_PORT);
+      this.controlSocket = await tcpConnectWithRetry(this.forwardPort);
       this.controlReader = new SocketReader(this.controlSocket);
       void this.readDeviceMessages();
     } catch (err) {
@@ -533,7 +546,7 @@ export class ScrcpyServer extends EventEmitter {
       // process may already be dead
     }
     if (this.deviceSerial) {
-      adbForwardRemove(this.deviceSerial, SCRCPY_FORWARD_PORT).catch(err => {
+      adbForwardRemove(this.deviceSerial, this.forwardPort).catch(err => {
         logger.warn(
           '[ScrcpyServer] Failed to remove port forward during cleanup',
           { error: err instanceof Error ? err.message : String(err) }

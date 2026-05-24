@@ -24,7 +24,7 @@ function parseDeviceMessageFromEnvelope(raw: string): DeviceMessage | null {
     }
 
     const payload = parsed.payload;
-    if (!payload || typeof payload !== 'object' || !("type" in payload)) {
+    if (!payload || typeof payload !== 'object' || !('type' in payload)) {
       return null;
     }
 

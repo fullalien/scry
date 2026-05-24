@@ -42,14 +42,15 @@ export function useClipboardSync(
   deviceMessageEvent: DeviceMessageEvent | null,
   notify: (text: string, tone: ToastTone, durationMs?: number) => void
 ): void {
-
-
   useEffect(() => {
     if (pageState !== 'streaming') {
       return;
     }
 
-    if (!deviceMessageEvent || deviceMessageEvent.message.type !== 'clipboard') {
+    if (
+      !deviceMessageEvent ||
+      deviceMessageEvent.message.type !== 'clipboard'
+    ) {
       return;
     }
 
@@ -111,7 +112,10 @@ export function useClipboardSync(
             notify('Pasted to device', 'success');
           },
           err => {
-            console.warn('[ClipboardSync] Failed to read browser clipboard', err);
+            console.warn(
+              '[ClipboardSync] Failed to read browser clipboard',
+              err
+            );
             notify('Clipboard read blocked by browser', 'error');
           }
         );

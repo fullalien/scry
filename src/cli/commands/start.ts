@@ -20,7 +20,7 @@ export function registerStartCommand(program: Command, config: AppConfig) {
     .action(async options => {
       const host = options.host as string;
       // Resolve available port (in case preferred port is occupied)
-      const port = await getAvailablePort(host, Number(options.port));
+      const port = await getAvailablePort(Number(options.port), host);
       const foreground = options.foreground as boolean;
 
       if (foreground) {
@@ -111,7 +111,11 @@ function tryHealthCheck(host: string, port: number): Promise<boolean> {
   });
 }
 
-async function runForegroundServer(host: string, port: number, config: AppConfig): Promise<void> {
+async function runForegroundServer(
+  host: string,
+  port: number,
+  config: AppConfig
+): Promise<void> {
   const { createServer } = await import('../../server/server.js');
   const server = await createServer({
     scrcpyMaxSize: config.scrcpy.maxSize,

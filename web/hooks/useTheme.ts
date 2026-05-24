@@ -59,5 +59,10 @@ export function useTheme() {
     });
   }, []);
 
-  return { theme, setTheme, toggleTheme, effectiveTheme: getEffectiveTheme(theme) };
+  return {
+    theme,
+    setTheme,
+    toggleTheme,
+    effectiveTheme: getEffectiveTheme(theme),
+  };
 }

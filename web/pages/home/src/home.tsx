@@ -20,7 +20,7 @@ function App() {
   };
 
   return (
-    <main className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 dark:from-[#1a1d23] dark:to-[#111419] p-6 font-sans">
+    <main className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 p-6 font-sans dark:from-[#1a1d23] dark:to-[#111419]">
       <div className="mx-auto max-w-2xl">
         <ErrorBanner error={error} onDismiss={() => setError(null)} />
 
@@ -38,10 +38,7 @@ function App() {
           ) : devices.length === 0 ? (
             <EmptyState devicesOk={devicesOk} />
           ) : (
-            <DeviceList
-              devices={devices}
-              scrcpySessions={scrcpySessions}
-            />
+            <DeviceList devices={devices} scrcpySessions={scrcpySessions} />
           )}
         </section>
       </div>

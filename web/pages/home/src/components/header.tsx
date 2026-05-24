@@ -14,8 +14,16 @@ export function Header({
   theme: 'light' | 'dark' | 'system';
   onToggleTheme: () => void;
 }) {
-  const themeIcon = theme === 'system' ? <Monitor size={14} /> : theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />;
-  const themeLabel = theme === 'system' ? 'System' : theme === 'dark' ? 'Dark' : 'Light';
+  const themeIcon =
+    theme === 'system' ? (
+      <Monitor size={14} />
+    ) : theme === 'dark' ? (
+      <Sun size={14} />
+    ) : (
+      <Moon size={14} />
+    );
+  const themeLabel =
+    theme === 'system' ? 'System' : theme === 'dark' ? 'Dark' : 'Light';
 
   return (
     <header className="mb-6">
@@ -25,11 +33,13 @@ export function Header({
             <Smartphone size={20} />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-[#e8ecf1]">Scry</h1>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-[#e8ecf1]">
+              Scry
+            </h1>
             <p className="text-xs text-gray-500 dark:text-[#9ca3af]">
               Web Screen Mirror
               {deviceCount > 0 && (
-                <span className="ml-1.5 inline-flex items-center rounded-full bg-gray-100 dark:bg-[#262a33] px-2 py-0.5 text-xs font-medium text-gray-600 dark:text-[#9ca3af]">
+                <span className="ml-1.5 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-[#262a33] dark:text-[#9ca3af]">
                   {deviceCount} {deviceCount === 1 ? 'device' : 'devices'}
                 </span>
               )}
@@ -39,19 +49,16 @@ export function Header({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="inline-flex items-center justify-center rounded-lg border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-[#1e222a] p-2 text-gray-600 dark:text-[#d1d5db] shadow-sm transition-all hover:bg-gray-50 dark:hover:bg-white/[0.08] hover:shadow disabled:opacity-50"
+            className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white p-2 text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:shadow disabled:opacity-50 dark:border-white/[0.08] dark:bg-[#1e222a] dark:text-[#d1d5db] dark:hover:bg-white/[0.08]"
             onClick={onRefresh}
             disabled={refreshing}
             aria-label="Refresh"
           >
-            <RefreshCw
-              size={14}
-              className={refreshing ? 'animate-spin' : ''}
-            />
+            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
           </button>
           <button
             type="button"
-            className="inline-flex items-center justify-center rounded-lg border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-[#1e222a] p-2 text-gray-600 dark:text-[#d1d5db] shadow-sm transition-all hover:bg-gray-50 dark:hover:bg-white/[0.08] hover:shadow disabled:opacity-50"
+            className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white p-2 text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:shadow disabled:opacity-50 dark:border-white/[0.08] dark:bg-[#1e222a] dark:text-[#d1d5db] dark:hover:bg-white/[0.08]"
             onClick={onToggleTheme}
             aria-label={`Theme: ${themeLabel}`}
           >
