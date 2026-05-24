@@ -6,6 +6,7 @@ import http from 'node:http';
 import { serverStateManager } from '../../core/server-state.js';
 import { homedir } from 'node:os';
 import type { AppConfig } from '../../core/config/schema.js';
+import { getAvailablePort } from '../../core/net/port.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -18,7 +19,8 @@ export function registerStartCommand(program: Command, config: AppConfig) {
     .option('--foreground', 'Run in foreground for debugging', false)
     .action(async options => {
       const host = options.host as string;
-      const port = Number(options.port);
+      // Resolve available port (in case preferred port is occupied)
+      const port = await getAvailablePort(host, Number(options.port));
       const foreground = options.foreground as boolean;
 
       if (foreground) {
