@@ -21,10 +21,13 @@ export {
   ControlMessageType,
   TouchAction,
   KeyAction,
+  ClipboardCopyKey,
   encodeInjectKeycodeEvent,
   encodeInjectTextEvent,
   encodeInjectTouchEvent,
   encodeBackOrScreenOn,
+  encodeGetClipboard,
+  encodeSetClipboard,
 } from './control-encoder.js';
 export {
   AndroidKeyCode,

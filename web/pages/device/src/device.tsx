@@ -19,6 +19,8 @@ import { useDeviceInfo } from './hooks/useDeviceInfo.js';
 import { useDeviceStream, type PageState } from './hooks/useDeviceStream.js';
 import { useTouchInput } from './hooks/useTouchInput.js';
 import { useKeyboardInput } from './hooks/useKeyboardInput.js';
+import { useClipboardSync } from './hooks/useClipboardSync.js';
+import { useToast } from './hooks/useToast.js';
 import { useTheme } from '../../../hooks/useTheme.js';
 import { DeviceToolbar } from './components/DeviceToolbar.js';
 import { DeviceScreen } from './components/DeviceScreen.js';
@@ -41,8 +43,20 @@ function DeviceApp() {
   const deviceSerial = getDeviceSerialFromUrl();
   const deviceInfo = useDeviceInfo(deviceSerial);
   const [retryKey, setRetryKey] = React.useState(0);
-  const { pageState, streamError, frameSize, fps, wsRef, handleRetry } =
+  const {
+    pageState,
+    streamError,
+    frameSize,
+    fps,
+    deviceMessageEvent,
+    wsRef,
+    handleRetry,
+  } =
     useDeviceStream(deviceSerial, canvasRef, retryKey);
+
+  const { toast, showToast } = useToast();
+  useClipboardSync(wsRef, pageState, deviceMessageEvent, showToast);
+
   const {
     touchPos,
     secondaryTouchPos,
@@ -165,6 +179,15 @@ function DeviceApp() {
         style={{ opacity: pageState === 'loading' ? 0 : 1 }}
       >
         <div className="device-stack">
+          {toast && (
+            <div
+              className={`app-toast app-toast-${toast.tone}`}
+              role="status"
+              aria-live="polite"
+            >
+              {toast.text}
+            </div>
+          )}
           {pageState === 'error' && streamError && (
             <DeviceErrorOverlay
               streamError={streamError}

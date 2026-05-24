@@ -103,6 +103,58 @@ body {
   box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
 }
 
+.app-toast {
+  position: absolute;
+  left: 50%;
+  top: -12px;
+  transform: translate(-50%, -100%);
+  z-index: 6;
+  min-height: 34px;
+  max-width: min(86vw, 360px);
+  padding: 8px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgb(16 20 30 / 10%);
+  backdrop-filter: blur(8px);
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 45%) inset,
+    0 10px 24px rgb(0 0 0 / 16%);
+  pointer-events: none;
+  animation: app-toast-in 180ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.app-toast-info {
+  background: rgb(235 245 255 / 90%);
+  color: rgb(26 92 155);
+}
+
+.app-toast-success {
+  background: rgb(229 249 240 / 92%);
+  color: rgb(13 113 70);
+}
+
+.app-toast-error {
+  background: rgb(255 238 240 / 92%);
+  color: rgb(170 34 56);
+}
+
+@keyframes app-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -100%) translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -100%) translateY(0) scale(1);
+  }
+}
+
 :root.dark .theme-toggle-btn {
   background: rgb(30 34 42 / 80%);
   border-color: rgb(255 255 255 / 8%);
@@ -113,4 +165,24 @@ body {
 :root.dark .theme-toggle-btn:hover {
   background: rgb(38 42 51);
   box-shadow: 0 4px 12px rgb(0 0 0 / 40%);
+}
+
+:root.dark .app-toast {
+  border-color: rgb(255 255 255 / 8%);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 32%);
+}
+
+:root.dark .app-toast-info {
+  background: rgb(24 44 63 / 90%);
+  color: rgb(147 210 255);
+}
+
+:root.dark .app-toast-success {
+  background: rgb(19 49 38 / 90%);
+  color: rgb(120 238 180);
+}
+
+:root.dark .app-toast-error {
+  background: rgb(61 24 31 / 90%);
+  color: rgb(255 161 172);
 }

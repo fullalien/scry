@@ -23,6 +23,15 @@ export function useKeyboardInput(
       )
         return;
 
+      const key = e.key.toLowerCase();
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        !e.altKey &&
+        (key === 'c' || key === 'v' || key === 'x')
+      ) {
+        return;
+      }
+
       const keycode = keyboardEventToAndroidKeycode(e);
       if (keycode !== undefined) {
         const msg = encodeInjectKeycodeEvent({
@@ -49,6 +58,15 @@ export function useKeyboardInput(
         e.target instanceof HTMLTextAreaElement
       )
         return;
+
+      const key = e.key.toLowerCase();
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        !e.altKey &&
+        (key === 'c' || key === 'v' || key === 'x')
+      ) {
+        return;
+      }
 
       const keycode = keyboardEventToAndroidKeycode(e);
       if (keycode !== undefined) {

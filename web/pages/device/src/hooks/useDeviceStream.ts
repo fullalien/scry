@@ -5,6 +5,62 @@ import { STREAM_TIMEOUT_MS } from '../constants';
 
 export type Size = { width: number; height: number };
 export type PageState = 'loading' | 'streaming' | 'error';
+export type DeviceMessage =
+  | { type: 'clipboard'; text: string }
+  | { type: 'ack_clipboard'; sequence: string }
+  | { type: 'uhid_output'; id: number; data?: string };
+export type DeviceMessageEvent = { id: number; message: DeviceMessage };
+
+function parseDeviceMessageFromEnvelope(raw: string): DeviceMessage | null {
+  try {
+    const parsed = JSON.parse(raw) as {
+      type?: unknown;
+      payload?: unknown;
+    };
+    if (parsed.type !== 'device-message') {
+      return null;
+    }
+
+    const payload = parsed.payload;
+    if (!payload || typeof payload !== 'object' || !("type" in payload)) {
+      return null;
+    }
+
+    const type = (payload as { type?: unknown }).type;
+    if (
+      type === 'clipboard' &&
+      typeof (payload as { text?: unknown }).text === 'string'
+    ) {
+      return {
+        type: 'clipboard',
+        text: (payload as { text: string }).text,
+      };
+    }
+
+    if (
+      type === 'ack_clipboard' &&
+      typeof (payload as { sequence?: unknown }).sequence === 'string'
+    ) {
+      return {
+        type: 'ack_clipboard',
+        sequence: (payload as { sequence: string }).sequence,
+      };
+    }
+
+    if (type === 'uhid_output' && typeof (payload as { id?: unknown }).id === 'number') {
+      const maybeData = (payload as { data?: unknown }).data;
+      return {
+        type: 'uhid_output',
+        id: (payload as { id: number }).id,
+        ...(typeof maybeData === 'string' ? { data: maybeData } : {}),
+      };
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 export function useDeviceStream(
   deviceSerial: string | null,
@@ -15,6 +71,7 @@ export function useDeviceStream(
   streamError: string | null;
   frameSize: Size | null;
   fps: number;
+  deviceMessageEvent: DeviceMessageEvent | null;
   wsRef: React.MutableRefObject<WebSocket | null>;
   handleRetry: () => void;
 } {
@@ -23,11 +80,15 @@ export function useDeviceStream(
   const [streamError, setStreamError] = useState<string | null>(null);
   const [frameSize, setFrameSize] = useState<Size | null>(null);
   const [fps, setFps] = useState(0);
+  const [deviceMessageEvent, setDeviceMessageEvent] =
+    useState<DeviceMessageEvent | null>(null);
+  const deviceMessageSeqRef = useRef(0);
 
   const handleRetry = useCallback(() => {
     setStreamError(null);
     setFrameSize(null);
     setFps(0);
+    setDeviceMessageEvent(null);
     setPageState('loading');
   }, []);
 
@@ -106,6 +167,14 @@ export function useDeviceStream(
         data: e.data instanceof ArrayBuffer ? '[binary data]' : e.data,
       });
       if (typeof e.data === 'string') {
+        const msg = parseDeviceMessageFromEnvelope(e.data);
+        if (msg) {
+          deviceMessageSeqRef.current += 1;
+          setDeviceMessageEvent({
+            id: deviceMessageSeqRef.current,
+            message: msg,
+          });
+        }
         return;
       }
       if (firstFrame) {
@@ -142,5 +211,13 @@ export function useDeviceStream(
     };
   }, [retryKey]);
 
-  return { pageState, streamError, frameSize, fps, wsRef, handleRetry };
+  return {
+    pageState,
+    streamError,
+    frameSize,
+    fps,
+    deviceMessageEvent,
+    wsRef,
+    handleRetry,
+  };
 }
