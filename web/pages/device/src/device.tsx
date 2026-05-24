@@ -17,6 +17,7 @@ import {
 import { useViewport } from './hooks/useViewport.js';
 import { useDeviceInfo } from './hooks/useDeviceInfo.js';
 import { useDeviceStream, type PageState } from './hooks/useDeviceStream.js';
+import { useDeviceControl } from './hooks/useDeviceControl.js';
 import { useTouchInput } from './hooks/useTouchInput.js';
 import { useKeyboardInput } from './hooks/useKeyboardInput.js';
 import { useClipboardSync } from './hooks/useClipboardSync.js';
@@ -48,14 +49,18 @@ function DeviceApp() {
     streamError,
     frameSize,
     fps,
-    deviceMessageEvent,
-    wsRef,
     handleRetry,
   } =
     useDeviceStream(deviceSerial, canvasRef, retryKey);
 
+  const { controlWsRef, deviceMessageEvent } = useDeviceControl(
+    deviceSerial,
+    pageState,
+    retryKey
+  );
+
   const { toast, showToast } = useToast();
-  useClipboardSync(wsRef, pageState, deviceMessageEvent, showToast);
+  useClipboardSync(controlWsRef, pageState, deviceMessageEvent, showToast);
 
   const {
     touchPos,
@@ -65,8 +70,8 @@ function DeviceApp() {
     handleMouseUp,
     handleMouseLeave,
     handleContextMenu,
-  } = useTouchInput(wsRef, canvasRef, frameSize);
-  useKeyboardInput(wsRef, pageState);
+  } = useTouchInput(controlWsRef, canvasRef, frameSize);
+  useKeyboardInput(controlWsRef, pageState);
 
   const handleRetryWithReset = React.useCallback(() => {
     handleRetry();
@@ -175,8 +180,7 @@ function DeviceApp() {
         </div>
       )}
       <div
-        className="device-stage"
-        style={{ opacity: pageState === 'loading' ? 0 : 1 }}
+        className={`device-stage ${pageState === 'loading' ? 'device-stage-loading' : 'device-stage-ready'}`}
       >
         <div className="device-stack">
           {toast && (
@@ -200,7 +204,7 @@ function DeviceApp() {
             pageState={pageState as PageState}
             frameSize={frameSize}
             fps={fps}
-            wsRef={wsRef}
+            wsRef={controlWsRef}
             onScreenshot={handleScreenshot}
           />
           <DeviceScreen

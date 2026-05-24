@@ -5,4 +5,5 @@ export {
   SCRCPY_STOP_PATH,
   SCRCPY_STREAM_PATH,
   SCRCPY_DEVICE_STREAM_PATH,
+  SCRCPY_DEVICE_CONTROL_PATH,
 } from './path.server.js';

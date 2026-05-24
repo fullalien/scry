@@ -53,6 +53,14 @@ body {
   transition: opacity 200ms ease;
 }
 
+.device-stage-loading {
+  opacity: 0;
+}
+
+.device-stage-ready {
+  opacity: 1;
+}
+
 .device-stack {
   position: relative;
   display: flex;
@@ -91,6 +99,7 @@ body {
   border-radius: 8px;
   border: 1px solid rgb(16 20 30 / 10%);
   background: rgb(255 255 255 / 80%);
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   cursor: pointer;
   color: #4b5563;
@@ -117,6 +126,7 @@ body {
   justify-content: center;
   border-radius: 999px;
   border: 1px solid rgb(16 20 30 / 10%);
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   text-align: center;
   font-size: 12px;

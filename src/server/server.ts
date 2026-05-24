@@ -13,6 +13,7 @@ import {
   SCRCPY_STOP_PATH,
   SCRCPY_STREAM_PATH,
   SCRCPY_DEVICE_STREAM_PATH,
+  SCRCPY_DEVICE_CONTROL_PATH,
 } from '../shared/constants/path.server.js';
 import { listDevices } from './handlers/device-handler.js';
 import {
@@ -21,6 +22,7 @@ import {
   stopSession,
   scrcpyStream,
   scrcpyDeviceStream,
+  scrcpyDeviceControl,
 } from './handlers/scrcpy-handler.js';
 
 export type ServerOptions = {
@@ -108,5 +110,10 @@ function registerScrcpyRoutes(
     SCRCPY_DEVICE_STREAM_PATH,
     { websocket: true },
     scrcpyDeviceStream(scrcpyManager, options)
+  );
+  app.get(
+    SCRCPY_DEVICE_CONTROL_PATH,
+    { websocket: true },
+    scrcpyDeviceControl(scrcpyManager)
   );
 }

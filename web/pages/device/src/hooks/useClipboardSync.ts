@@ -4,7 +4,8 @@ import {
   encodeGetClipboard,
   encodeSetClipboard,
 } from '@shared/scrcpy';
-import type { DeviceMessageEvent, PageState } from './useDeviceStream';
+import type { PageState } from './useDeviceStream';
+import type { DeviceMessageEvent } from './useDeviceControl';
 import type { ToastTone } from './useToast';
 
 function sendControlPacket(

@@ -42,7 +42,7 @@ function deepEqual(a: AppData | null, b: AppData | null): boolean {
       sa.status !== sb.status ||
       sa.createdAt !== sb.createdAt ||
       sa.error !== sb.error ||
-      sa.viewerCount !== sb.viewerCount
+      sa.activeChannelCount !== sb.activeChannelCount
     ) {
       return false;
     }

@@ -17,7 +17,7 @@ export function DeviceCard({
       className={`group overflow-hidden rounded-xl border bg-white dark:bg-[#1e222a] shadow-sm transition-all duration-200 hover:shadow-md ${
         isActive
           ? 'border-emerald-400 dark:border-emerald-600 hover:border-emerald-500 dark:hover:border-emerald-500'
-          : 'border-gray-200 dark:border-white/[0.08] hover:border-gray-300 dark:hover:border-white/[0.12]'
+          : 'border-gray-200 dark:border-white/8 hover:border-gray-300 dark:hover:border-white/12'
       }`}
     >
       <div className="flex items-start gap-3 p-4">
@@ -40,13 +40,13 @@ export function DeviceCard({
                 ? `${device.brand} ${device.model}`
                 : device.id}
             </span>
-            {isActive && runningSession!.viewerCount > 0 && (
+            {isActive && runningSession!.activeChannelCount > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-200 dark:ring-emerald-700">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500 dark:bg-emerald-400" />
                 Live
               </span>
             )}
-            {isActive && runningSession!.viewerCount === 0 && (
+            {isActive && runningSession!.activeChannelCount === 0 && (
               <span className="inline-flex items-center rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-200 dark:ring-emerald-700">
                 Running
               </span>
@@ -59,7 +59,7 @@ export function DeviceCard({
           </div>
 
           <div className="flex flex-wrap gap-1.5">
-            <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 dark:bg-[#262a33] px-2 py-0.5 font-mono text-xs text-gray-500 dark:text-[#9ca3af] ring-1 ring-gray-200 dark:ring-white/[0.08]">
+            <span className="inline-flex items-center gap-1 rounded-md bg-gray-50 dark:bg-[#262a33] px-2 py-0.5 font-mono text-xs text-gray-500 dark:text-[#9ca3af] ring-1 ring-gray-200 dark:ring-white/8">
               <Hash size={10} className="shrink-0" />
               {device.id}
             </span>

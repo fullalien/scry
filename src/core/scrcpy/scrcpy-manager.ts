@@ -17,7 +17,7 @@ export type ScrcpySession = {
   updatedAt: number;
   error?: string;
   stats?: ScrcpyServerStats;
-  viewerCount: number;
+  activeChannelCount: number;
 };
 
 export type StartScrcpyOptions = Partial<
@@ -33,7 +33,7 @@ export type StopScrcpyResult = 'stopped' | 'not-found' | 'already-stopped';
 type ScrcpyEntry = {
   session: ScrcpySession;
   process: ScrcpyServer;
-  viewerCount: number;
+  activeChannelCount: number;
 };
 
 export class ScrcpyManager {
@@ -108,11 +108,11 @@ export class ScrcpyManager {
           );
         }
 
-        entry.viewerCount++;
+        entry.activeChannelCount++;
         logger.info('[ScrcpyManager] Viewer added to existing session', {
           sessionId: entry.session.id,
           deviceSerial,
-          viewerCount: entry.viewerCount,
+          activeChannelCount: entry.activeChannelCount,
         });
         return { ok: true, session: entry.session };
       }
@@ -136,11 +136,11 @@ export class ScrcpyManager {
       return { ok: false, error: 'Session was already removed' };
     }
 
-    entry.viewerCount++;
+    entry.activeChannelCount++;
     logger.info('[ScrcpyManager] Viewer added to new session', {
       sessionId: session.id,
       deviceSerial,
-      viewerCount: entry.viewerCount,
+      activeChannelCount: entry.activeChannelCount,
     });
     return { ok: true, session };
   }
@@ -148,17 +148,17 @@ export class ScrcpyManager {
   removeViewer(deviceSerial: string): void {
     for (const [id, entry] of this.entries) {
       if (entry.session.deviceSerial === deviceSerial) {
-        entry.viewerCount = Math.max(0, entry.viewerCount - 1);
+        entry.activeChannelCount = Math.max(0, entry.activeChannelCount - 1);
         logger.info('[ScrcpyManager] Viewer removed', {
           sessionId: id,
           deviceSerial,
-          viewerCount: entry.viewerCount,
+          activeChannelCount: entry.activeChannelCount,
         });
-        if (entry.viewerCount === 0) {
+        if (entry.activeChannelCount === 0) {
           // Debounce auto-stop to prevent unnecessary restarts on page refresh
           const timer = setTimeout(() => {
             const current = this.entries.get(id);
-            if (current && current.viewerCount === 0) {
+            if (current && current.activeChannelCount === 0) {
               logger.info('[ScrcpyManager] Auto-stopping after grace period', {
                 sessionId: id,
                 deviceSerial,
@@ -182,13 +182,17 @@ export class ScrcpyManager {
     }
   }
 
-  getViewerCount(deviceSerial: string): number {
+  getActiveChannelCount(deviceSerial: string): number {
     for (const entry of this.entries.values()) {
       if (entry.session.deviceSerial === deviceSerial) {
-        return entry.viewerCount;
+        return entry.activeChannelCount;
       }
     }
     return 0;
+  }
+
+  getViewerCount(deviceSerial: string): number {
+    return this.getActiveChannelCount(deviceSerial);
   }
 
   private async doStart(
@@ -229,10 +233,10 @@ export class ScrcpyManager {
       status: 'running',
       createdAt: now,
       updatedAt: now,
-      viewerCount: 0,
+      activeChannelCount: 0,
     };
 
-    this.entries.set(id, { session, process: server, viewerCount: 0 });
+    this.entries.set(id, { session, process: server, activeChannelCount: 0 });
 
     logger.info('scrcpy-session started', {
       sessionId: id,
@@ -309,7 +313,7 @@ export class ScrcpyManager {
     return [...this.entries.values()]
       .map(e => ({
         ...e.session,
-        viewerCount: e.viewerCount,
+        activeChannelCount: e.activeChannelCount,
         stats: e.process.getStats(),
       }))
       .sort((a, b) => b.createdAt - a.createdAt);
@@ -317,6 +321,45 @@ export class ScrcpyManager {
 
   getProcess(id: string): ScrcpyServer | undefined {
     return this.entries.get(id)?.process;
+  }
+
+  attachViewerByDevice(
+    deviceSerial: string
+  ): { sessionId: string; process: ScrcpyServer } | undefined {
+    for (const [sessionId, entry] of this.entries) {
+      if (
+        entry.session.deviceSerial === deviceSerial &&
+        entry.session.status === 'running' &&
+        entry.process.running
+      ) {
+        const timer = this.stopTimers.get(sessionId);
+        if (timer) {
+          clearTimeout(timer);
+          this.stopTimers.delete(sessionId);
+          logger.debug(
+            '[ScrcpyManager] Cancelled auto-stop timer for active viewer',
+            {
+              sessionId,
+              deviceSerial,
+            }
+          );
+        }
+
+        entry.activeChannelCount++;
+        logger.info('[ScrcpyManager] Viewer added to existing session', {
+          sessionId,
+          deviceSerial,
+          activeChannelCount: entry.activeChannelCount,
+        });
+
+        return {
+          sessionId,
+          process: entry.process,
+        };
+      }
+    }
+
+    return undefined;
   }
 }
 

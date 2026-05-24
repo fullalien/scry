@@ -33,16 +33,28 @@ export function DeviceScreen({
   onMouseLeave,
   onContextMenu,
 }: DeviceScreenProps) {
+  const wrapperRef = React.useRef<HTMLDivElement>(null);
+  const screenRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (wrapper) {
+      wrapper.style.width = `${displaySize.width + SCREEN_BORDER_WIDTH * 2}px`;
+      wrapper.style.height = `${(displaySize.height + SCREEN_BORDER_WIDTH * 2) * screenScale}px`;
+      wrapper.style.transform = `scale(${screenScale})`;
+    }
+
+    const screen = screenRef.current;
+    if (screen) {
+      screen.style.width = `${displaySize.width}px`;
+      screen.style.height = `${displaySize.height}px`;
+    }
+  }, [displaySize.height, displaySize.width, screenScale]);
+
   return (
     <div
+      ref={wrapperRef}
       className="device-screen-wrapper"
-      style={{
-        width: `${displaySize.width + SCREEN_BORDER_WIDTH * 2}px`,
-        height: `${(displaySize.height + SCREEN_BORDER_WIDTH * 2) * screenScale}px`,
-        transform: `scale(${screenScale})`,
-        transformOrigin: 'top center',
-        cursor: 'none',
-      }}
       onMouseMove={onMouseMove}
       onMouseDown={onMouseDown}
       onMouseUp={onMouseUp}
@@ -61,11 +73,8 @@ export function DeviceScreen({
       >
         <Squircle cornerRadius={screenCornerRadius} cornerSmoothing={0.8}>
           <div
+            ref={screenRef}
             className="device-screen"
-            style={{
-              width: `${displaySize.width}px`,
-              height: `${displaySize.height}px`,
-            }}
           >
             <canvas ref={canvasRef} className="device-canvas" />
             {pageState === 'loading' && (

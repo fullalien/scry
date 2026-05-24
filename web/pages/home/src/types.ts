@@ -19,7 +19,7 @@ export type ScrcpySession = {
   status: 'running' | 'stopped' | 'error';
   createdAt: number;
   error?: string;
-  viewerCount: number;
+  activeChannelCount: number;
   stats?: {
     packets: number;
     sessionMeta: number;
