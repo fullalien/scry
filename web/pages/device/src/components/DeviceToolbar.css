@@ -38,6 +38,33 @@
   text-overflow: ellipsis;
 }
 
+.toolbar-fps {
+  display: inline-block;
+  min-width: 36px;
+  font-size: 10px;
+  color: rgb(66 71 81);
+  line-height: 1.2;
+  text-align: left;
+}
+
+.toolbar-meta-row {
+  display: flex;
+  align-items: left;
+  min-width: 0;
+}
+
+.toolbar-sep {
+  font-size: 10px;
+  color: rgb(66 71 81);
+  line-height: 1.2;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+:root.dark .toolbar-sep {
+  color: rgb(156 163 175);
+}
+
 .toolbar-right {
   display: flex;
   align-items: center;
@@ -101,6 +128,10 @@
 }
 
 :root.dark .toolbar-meta {
+  color: rgb(156 163 175);
+}
+
+:root.dark .toolbar-fps {
   color: rgb(156 163 175);
 }
 

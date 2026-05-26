@@ -40,10 +40,11 @@ export function DeviceToolbar({
     frameSize
       ? `${frameSize.width}x${frameSize.height}`
       : deviceInfo?.screenRes || null,
-    fps > 0 ? `${fps} fps` : null,
   ]
     .filter(Boolean)
     .join('  •  ');
+
+  const fpsText = fps >= 0 ? `${fps} fps` : null;
 
   const sendNavigationKey = React.useCallback((keycode: number) => {
     const ws = wsRef.current;
@@ -61,7 +62,13 @@ export function DeviceToolbar({
     <div className="device-toolbar" role="status" aria-live="polite">
       <div className="toolbar-left">
         <span className="toolbar-title">{title}</span>
-        {meta && <span className="toolbar-meta">{meta}</span>}
+        <div className="toolbar-meta-row">
+          {meta && <span className="toolbar-meta">{meta}</span>}
+          {meta && fpsText && (
+            <span className="toolbar-sep" aria-hidden="true">•</span>
+          )}
+          {fpsText && <span className="toolbar-fps">{fpsText}</span>}
+        </div>
       </div>
       <div className="toolbar-right">
         <button
