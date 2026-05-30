@@ -8,9 +8,9 @@ import {
   PKT_FLAG_CONFIG,
   PKT_FLAG_KEY_FRAME,
   VIDEO_MSG_TYPE,
+  ControlMessageType,
 } from '../../shared/scrcpy/index.js';
 
-const MAX_PENDING_FRAMES = 1;
 const WS_BUFFER_HIGH_WATERMARK_BYTES = 1024 * 1024;
 const WS_BUFFER_LOW_WATERMARK_BYTES = 128 * 1024;
 
@@ -37,13 +37,6 @@ function getSocketBufferedAmount(socket: any): number {
   return typeof socket.bufferedAmount === 'number' ? socket.bufferedAmount : 0;
 }
 
-function pushPendingFrame(pendingFrames: Buffer[], frame: Buffer): void {
-  while (pendingFrames.length >= MAX_PENDING_FRAMES) {
-    pendingFrames.shift();
-  }
-  pendingFrames.push(frame);
-}
-
 function getPtsFlags(frame: Buffer): bigint | undefined {
   if (frame.length < 9 || frame[0] !== VIDEO_MSG_TYPE) {
     return undefined;
@@ -65,6 +58,12 @@ function isKeyFrame(frame: Buffer): boolean {
     return false;
   }
   return hasIdrNal(frame.subarray(9));
+}
+
+function requestFreshVideoFrame(proc: {
+  sendControl(data: Buffer): void;
+}): void {
+  proc.sendControl(Buffer.from([ControlMessageType.RESET_VIDEO]));
 }
 
 export const listSessions = (scrcpyManager: ScrcpyManager) => async () => {
@@ -136,9 +135,9 @@ export const scrcpyStream =
       return;
     }
 
-    const pendingFrames: Buffer[] = [];
     const bootstrapFrames: Buffer[] = [];
     let flushed = false;
+    let bootstrapReady = false;
     let droppingForLatency = false;
     let droppedFrameCount = 0;
     let recoveryConfigFrame: Buffer | undefined;
@@ -166,16 +165,13 @@ export const scrcpyStream =
     };
 
     const flushPending = () => {
-      if (flushed || socket.readyState !== socket.OPEN) return;
+      if (flushed || !bootstrapReady || socket.readyState !== socket.OPEN)
+        return;
       flushed = true;
       for (const frame of bootstrapFrames) {
         socket.send(frame);
       }
       bootstrapFrames.length = 0;
-      for (const frame of pendingFrames) {
-        socket.send(frame);
-      }
-      pendingFrames.length = 0;
     };
 
     const onData = (chunk: Buffer) => {
@@ -184,7 +180,17 @@ export const scrcpyStream =
       }
 
       if (!flushed) {
-        pushPendingFrame(pendingFrames, chunk);
+        if (isConfigFrame(chunk)) {
+          bootstrapFrames.length = 0;
+          bootstrapFrames.push(chunk);
+          return;
+        }
+
+        if (isKeyFrame(chunk) && bootstrapFrames.length > 0) {
+          bootstrapFrames.push(chunk);
+          bootstrapReady = true;
+          flushPending();
+        }
         return;
       }
 
@@ -228,19 +234,16 @@ export const scrcpyStream =
     proc.on('device-message', onDeviceMessage);
 
     const codecConfigFrame = proc.getLatestCodecConfigFrame();
-    const keyFrame = proc.getLatestKeyFrame();
 
     if (codecConfigFrame) {
       bootstrapFrames.push(codecConfigFrame);
-    }
-    if (keyFrame) {
-      bootstrapFrames.push(keyFrame);
     }
 
     if (socket.readyState === socket.OPEN) {
       flushPending();
     }
     socket.on('open', flushPending);
+    requestFreshVideoFrame(proc);
 
     socket.on('message', (msg: Buffer) => {
       proc.sendControl(msg);
@@ -296,9 +299,9 @@ export const scrcpyDeviceStream =
       return;
     }
 
-    const pendingFrames: Buffer[] = [];
     const bootstrapFrames: Buffer[] = [];
     let flushed = false;
+    let bootstrapReady = false;
     let droppingForLatency = false;
     let droppedFrameCount = 0;
     let recoveryConfigFrame: Buffer | undefined;
@@ -326,16 +329,13 @@ export const scrcpyDeviceStream =
     };
 
     const flushPending = () => {
-      if (flushed || socket.readyState !== socket.OPEN) return;
+      if (flushed || !bootstrapReady || socket.readyState !== socket.OPEN)
+        return;
       flushed = true;
       for (const frame of bootstrapFrames) {
         socket.send(frame);
       }
       bootstrapFrames.length = 0;
-      for (const frame of pendingFrames) {
-        socket.send(frame);
-      }
-      pendingFrames.length = 0;
     };
 
     const onData = (chunk: Buffer) => {
@@ -344,7 +344,17 @@ export const scrcpyDeviceStream =
       }
 
       if (!flushed) {
-        pushPendingFrame(pendingFrames, chunk);
+        if (isConfigFrame(chunk)) {
+          bootstrapFrames.length = 0;
+          bootstrapFrames.push(chunk);
+          return;
+        }
+
+        if (isKeyFrame(chunk) && bootstrapFrames.length > 0) {
+          bootstrapFrames.push(chunk);
+          bootstrapReady = true;
+          flushPending();
+        }
         return;
       }
 
@@ -380,19 +390,16 @@ export const scrcpyDeviceStream =
     proc.on('exit', onExit);
 
     const codecConfigFrame = proc.getLatestCodecConfigFrame();
-    const keyFrame = proc.getLatestKeyFrame();
 
     if (codecConfigFrame) {
       bootstrapFrames.push(codecConfigFrame);
-    }
-    if (keyFrame) {
-      bootstrapFrames.push(keyFrame);
     }
 
     if (socket.readyState === socket.OPEN) {
       flushPending();
     }
     socket.on('open', flushPending);
+    requestFreshVideoFrame(proc);
 
     socket.on('error', (err: Error) => {
       logger.warn('[ScrcpyHandler] Stream socket error', {

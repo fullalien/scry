@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 type Theme = 'light' | 'dark' | 'system';
 
 const THEME_KEY = 'scry-theme';
+const DEFAULT_THEME: Theme = 'system';
 
 function getSystemTheme(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -28,7 +29,7 @@ export function useTheme() {
     const stored = localStorage.getItem(THEME_KEY) as Theme | null;
     return stored && ['light', 'dark', 'system'].includes(stored)
       ? stored
-      : 'system';
+      : DEFAULT_THEME;
   });
 
   useEffect(() => {
