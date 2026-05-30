@@ -1,7 +1,7 @@
 import React from 'react';
 import { Squircle } from '@squircle-js/react';
 import { SCREEN_BORDER_WIDTH, DEFAULT_SCREEN_RADIUS } from '../constants';
-import { toCssInchPixels, parseDensity, type Size } from '../utils/resolution';
+import type { Size } from '../utils/resolution';
 import type { AdbDevice } from '../hooks/useDeviceInfo';
 import type { PageState } from '../hooks/useDeviceStream';
 import { Spinner } from '../../../../components/spinner';

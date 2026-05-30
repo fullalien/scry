@@ -26,6 +26,8 @@ export type AdbDevice = {
   apiLevel?: string;
   screenRes?: string;
   screenDensity?: string;
+  screenXDpi?: number;
+  screenYDpi?: number;
   screenCornerRadius?: number;
 };
 
@@ -47,6 +49,8 @@ type DeviceDetails = {
   apiLevel?: string;
   screenRes?: string;
   screenDensity?: string;
+  screenXDpi?: number;
+  screenYDpi?: number;
   screenCornerRadius?: number;
 };
 
@@ -59,18 +63,18 @@ async function getDeviceDetails(deviceId: string): Promise<DeviceDetails> {
       throw new Error('Invalid device ID format');
     }
 
-    // Query all props + wm size/density in one shell invocation
+    // Query all props + screen metrics in one shell invocation.
     const propsQuery = DEVICE_PROPS.map(p => `getprop ${p}`).join('; ');
     const stdout = await adbShell(
       deviceId,
-      `${propsQuery}; echo "---SIZE---"; wm size; echo "---DENSITY---"; wm density; echo "---CORNER---"; dumpsys window | grep -i "mRoundedCorners="`
+      `${propsQuery}; echo "---SIZE---"; wm size; echo "---DENSITY---"; wm density; echo "---DISPLAY---"; dumpsys display | grep -m 1 -E "xDpi=|\\([0-9.]+ x [0-9.]+\\) dpi" || true; echo "---CORNER---"; dumpsys window | grep -i "mRoundedCorners=" || true`
     );
 
     // Strip \r to handle Android's \r\n line endings
     const clean = (s: string) => s.replace(/\r/g, '').trim();
 
-    const [propsRaw, sizeRaw, densityRaw, cornerRaw] = stdout.split(
-      /---SIZE---|---DENSITY---|---CORNER---/
+    const [propsRaw, sizeRaw, densityRaw, displayRaw, cornerRaw] = stdout.split(
+      /---SIZE---|---DENSITY---|---DISPLAY---|---CORNER---/
     );
     const propLines = clean(propsRaw ?? '').split('\n');
 
@@ -90,6 +94,14 @@ async function getDeviceDetails(deviceId: string): Promise<DeviceDetails> {
         .replace(/Physical density:\s*/i, '')
         .replace(/Override density:\s*\S+/i, '')
         .trim() || undefined;
+
+    const displayText = clean(displayRaw ?? '');
+    const screenXDpi =
+      parseDisplayDpi(displayText, /xDpi[=\s]+([\d.]+)/i) ??
+      parseDisplayDpi(displayText, /\(([\d.]+)\s+x\s+[\d.]+\)\s+dpi/i);
+    const screenYDpi =
+      parseDisplayDpi(displayText, /yDpi[=\s]+([\d.]+)/i) ??
+      parseDisplayDpi(displayText, /\([\d.]+\s+x\s+([\d.]+)\)\s+dpi/i);
 
     // corner radius → parse from dumpsys window mRoundedCorners line
     // Format: mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=60, ...}, ...]}
@@ -114,11 +126,21 @@ async function getDeviceDetails(deviceId: string): Promise<DeviceDetails> {
       apiLevel: apiLevel || undefined,
       screenRes,
       screenDensity,
+      screenXDpi,
+      screenYDpi,
       screenCornerRadius,
     };
   } catch {
     return {};
   }
+}
+
+function parseDisplayDpi(text: string, pattern: RegExp): number | undefined {
+  const match = text.match(pattern);
+  if (!match) return undefined;
+  const value = Number(match[1]);
+  if (!Number.isFinite(value) || value <= 0) return undefined;
+  return value;
 }
 
 export async function listAdbDevices(): Promise<AdbDevice[]> {

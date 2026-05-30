@@ -20,8 +20,12 @@ export function parseDensity(value?: string): number | null {
   return density;
 }
 
-export function toCssInchPixels(px: number, density: number): number {
-  return (px * 96) / density;
+export function toCssInchPixels(
+  px: number,
+  density: number,
+  cssPxPerInch = 96
+): number {
+  return (px * cssPxPerInch) / density;
 }
 
 export function alignOrientation(target: Size, reference: Size): Size {

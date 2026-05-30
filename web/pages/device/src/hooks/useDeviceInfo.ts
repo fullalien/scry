@@ -9,6 +9,8 @@ export type AdbDevice = {
   androidVersion?: string;
   screenRes?: string;
   screenDensity?: string;
+  screenXDpi?: number;
+  screenYDpi?: number;
   screenCornerRadius?: number;
 };
 

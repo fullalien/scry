@@ -65,7 +65,9 @@ export function DeviceToolbar({
         <div className="toolbar-meta-row">
           {meta && <span className="toolbar-meta">{meta}</span>}
           {meta && fpsText && (
-            <span className="toolbar-sep" aria-hidden="true">•</span>
+            <span className="toolbar-sep" aria-hidden="true">
+              •
+            </span>
           )}
           {fpsText && <span className="toolbar-fps">{fpsText}</span>}
         </div>

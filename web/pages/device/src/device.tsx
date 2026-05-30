@@ -15,6 +15,7 @@ import {
   SCREEN_BORDER_WIDTH,
 } from './constants.js';
 import { useViewport } from './hooks/useViewport.js';
+import { useHostCssPxPerInch } from './hooks/useHostCssPxPerInch.js';
 import { useDeviceInfo } from './hooks/useDeviceInfo.js';
 import { useDeviceStream, type PageState } from './hooks/useDeviceStream.js';
 import { useDeviceControl } from './hooks/useDeviceControl.js';
@@ -33,6 +34,7 @@ function DeviceApp() {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const ctxRef = React.useRef<CanvasRenderingContext2D | null>(null);
   const { theme, toggleTheme } = useTheme();
+  const hostCssPxPerInch = useHostCssPxPerInch();
 
   React.useEffect(() => {
     const canvas = canvasRef.current;
@@ -74,30 +76,53 @@ function DeviceApp() {
 
   const displaySize = React.useMemo<Size>(() => {
     const resolution = parseResolution(deviceInfo?.screenRes);
-    const density = parseDensity(deviceInfo?.screenDensity);
+    const fallbackDensity = parseDensity(deviceInfo?.screenDensity);
 
-    if (resolution && density) {
+    if (resolution && fallbackDensity) {
+      const widthDensity = deviceInfo?.screenXDpi ?? fallbackDensity;
+      const heightDensity = deviceInfo?.screenYDpi ?? fallbackDensity;
       const physical: Size = {
-        width: toCssInchPixels(resolution.width, density),
-        height: toCssInchPixels(resolution.height, density),
+        width: toCssInchPixels(
+          resolution.width,
+          widthDensity,
+          hostCssPxPerInch
+        ),
+        height: toCssInchPixels(
+          resolution.height,
+          heightDensity,
+          hostCssPxPerInch
+        ),
       };
       if (frameSize) {
-        const aligned = alignOrientation(physical, frameSize);
-        const frameAspect = frameSize.height / frameSize.width;
-        return { width: aligned.width, height: aligned.width * frameAspect };
+        return alignOrientation(physical, frameSize);
       }
       return physical;
     }
 
     if (frameSize) {
       return {
-        width: toCssInchPixels(frameSize.width, DEFAULT_FALLBACK_DPI),
-        height: toCssInchPixels(frameSize.height, DEFAULT_FALLBACK_DPI),
+        width: toCssInchPixels(
+          frameSize.width,
+          DEFAULT_FALLBACK_DPI,
+          hostCssPxPerInch
+        ),
+        height: toCssInchPixels(
+          frameSize.height,
+          DEFAULT_FALLBACK_DPI,
+          hostCssPxPerInch
+        ),
       };
     }
 
     return { width: 360, height: 780 };
-  }, [deviceInfo?.screenDensity, deviceInfo?.screenRes, frameSize]);
+  }, [
+    deviceInfo?.screenDensity,
+    deviceInfo?.screenRes,
+    deviceInfo?.screenXDpi,
+    deviceInfo?.screenYDpi,
+    frameSize,
+    hostCssPxPerInch,
+  ]);
 
   const screenScale = React.useMemo(() => {
     const w = displaySize.width + SCREEN_BORDER_WIDTH * 2;
@@ -112,15 +137,23 @@ function DeviceApp() {
       viewport.height - verticalPadding - toolbarHeight - gapHeight
     );
     return Math.min(1, availableWidth / w, availableHeight / h);
-  }, [displaySize, viewport]);
+  }, [displaySize.height, displaySize.width, viewport]);
 
   const screenCornerRadius = React.useMemo(() => {
     const density = parseDensity(deviceInfo?.screenDensity);
     if (deviceInfo?.screenCornerRadius && density) {
-      return toCssInchPixels(deviceInfo.screenCornerRadius, density);
+      return toCssInchPixels(
+        deviceInfo.screenCornerRadius,
+        density,
+        hostCssPxPerInch
+      );
     }
     return DEFAULT_SCREEN_RADIUS;
-  }, [deviceInfo?.screenCornerRadius, deviceInfo?.screenDensity]);
+  }, [
+    deviceInfo?.screenCornerRadius,
+    deviceInfo?.screenDensity,
+    hostCssPxPerInch,
+  ]);
 
   const handleScreenshot = React.useCallback(() => {
     const canvas = canvasRef.current;

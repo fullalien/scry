@@ -1,6 +1,7 @@
 export const API_PREFIX = '/api';
 
 export const DEVICES_PATH = `${API_PREFIX}/devices`;
+export const HOST_DISPLAY_PATH = `${API_PREFIX}/host-display`;
 
 export const SCRCPY_PATH = `${API_PREFIX}/scrcpy`;
 export const SCRCPY_STOP_PATH = `${SCRCPY_PATH}/:id/stop`;

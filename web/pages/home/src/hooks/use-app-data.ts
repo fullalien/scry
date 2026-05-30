@@ -25,6 +25,8 @@ function deepEqual(a: AppData | null, b: AppData | null): boolean {
       da.apiLevel !== db.apiLevel ||
       da.screenRes !== db.screenRes ||
       da.screenDensity !== db.screenDensity ||
+      da.screenXDpi !== db.screenXDpi ||
+      da.screenYDpi !== db.screenYDpi ||
       da.screenCornerRadius !== db.screenCornerRadius
     ) {
       return false;

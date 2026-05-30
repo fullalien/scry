@@ -1,14 +1,10 @@
 import Fastify from 'fastify';
 import type { FastifyInstance } from 'fastify';
 import fastifyWebsocket from '@fastify/websocket';
-import fastifyStatic from '@fastify/static';
-import path from 'node:path';
-import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { ScrcpyManager } from '../core/scrcpy/scrcpy-manager.js';
-import { logger } from '../core/logger/logger.js';
 import {
   DEVICES_PATH,
+  HOST_DISPLAY_PATH,
   SCRCPY_PATH,
   SCRCPY_STOP_PATH,
   SCRCPY_STREAM_PATH,
@@ -16,6 +12,8 @@ import {
   SCRCPY_DEVICE_CONTROL_PATH,
 } from '../shared/constants/path.server.js';
 import { listDevices } from './handlers/device-handler.js';
+import { getHostDisplayInfo } from './handlers/host-display-handler.js';
+import { registerViteFastify } from './vite-fastify.js';
 import {
   listSessions,
   startSession,
@@ -30,11 +28,6 @@ export type ServerOptions = {
   scrcpyMaxSize: number;
   scrcpyMaxFps: number;
 };
-
-const projectRoot = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '../../'
-);
 
 export async function createServer(options: ServerOptions) {
   const scrcpyManager = ScrcpyManager.instance;
@@ -54,47 +47,9 @@ export async function createServer(options: ServerOptions) {
   return app;
 }
 
-const cachedDeviceHtml = fs.readFileSync(
-  path.join(projectRoot, 'dist', 'web', 'pages', 'device', 'index.html'),
-  'utf8'
-);
-const cachedHomeHtml = fs.readFileSync(
-  path.join(projectRoot, 'dist', 'web', 'pages', 'home', 'index.html'),
-  'utf8'
-);
-
-async function registerViteFastify(app: FastifyInstance): Promise<void> {
-  const webDir = path.join(projectRoot, 'dist', 'web');
-  if (!fs.existsSync(webDir)) {
-    logger.warn('Web directory not found, skipping static file serving');
-    return;
-  }
-  await app.register(fastifyStatic, {
-    root: path.join(webDir, 'assets'),
-    prefix: '/assets/',
-    decorateReply: false,
-  });
-
-  const deviceHtmlPath = path.join(webDir, 'pages', 'device', 'index.html');
-  const homeHtmlPath = path.join(webDir, 'pages', 'home', 'index.html');
-
-  const isDev = process.env['NODE_ENV'] !== 'production';
-
-  app.get('/device/*', async (_request, reply) => {
-    const html = isDev
-      ? fs.readFileSync(deviceHtmlPath, 'utf8')
-      : cachedDeviceHtml;
-    return reply.type('text/html').send(html);
-  });
-
-  app.get('/*', async (_request, reply) => {
-    const html = isDev ? fs.readFileSync(homeHtmlPath, 'utf8') : cachedHomeHtml;
-    return reply.type('text/html').send(html);
-  });
-}
-
 function registerDeviceRoutes(app: FastifyInstance) {
   app.get(DEVICES_PATH, listDevices);
+  app.get(HOST_DISPLAY_PATH, getHostDisplayInfo);
 }
 
 function registerScrcpyRoutes(
